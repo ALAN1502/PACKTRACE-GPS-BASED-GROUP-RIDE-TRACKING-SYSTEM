@@ -1,0 +1,141 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — PackTrace</title>
+<link rel="stylesheet" href="{% static 'css/packtrace.css' %}">
+</head>
+<body>
+<div class="auth-shell">
+
+  <!-- Hero / signature panel -->
+  <section class="auth-hero">
+    <div class="hero-top">
+      <div class="wordmark"><span class="pulse-dot"></span>PACKTRACE</div>
+      <p class="hero-tagline">Live GPS for your whole riding group — one map, every rider, real time.</p>
+    </div>
+
+    <div class="hero-trace-wrap">
+      <svg viewBox="0 0 460 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="trace-path" d="M40,460 C110,430 70,360 150,325 C230,290 190,220 270,185 C330,158 300,95 380,55"/>
+        <circle class="trace-waypoint" style="animation-delay:.6s" cx="40" cy="460" r="5"/>
+        <circle class="trace-waypoint" style="animation-delay:1.4s" cx="150" cy="325" r="5"/>
+        <circle class="trace-waypoint" style="animation-delay:2.2s" cx="270" cy="185" r="5"/>
+        <circle class="trace-head" style="animation-delay:3.1s" cx="380" cy="55" r="6"/>
+      </svg>
+    </div>
+
+  </section>
+
+  <!-- Form panel -->
+  <section class="auth-form-panel">
+    <div class="auth-card">
+      <h1>Sign in to your pack</h1>
+      <p class="sub">Track your riders live, or get tracked by them.</p>
+
+      {% if error_message %}
+      <div class="server-alert danger">
+        <span>⚠</span>
+        <span>{{ error_message }}</span>
+      </div>
+      {% endif %}
+
+      <form id="login-form" method="POST" action="{% url 'login' %}" novalidate>
+        {% csrf_token %}
+        <div class="field" id="field-email">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" value="{{ email_val }}" placeholder="you@example.com" autocomplete="email" required>
+          <div class="field-error">Enter a valid email address.</div>
+        </div>
+
+        <div class="field" id="field-password">
+          <label for="password">Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" id="password-visibility-toggle" class="password-visibility-toggle" aria-label="Show password" aria-pressed="false" title="Show password">Show</button>
+          </div>
+          <div class="field-error">Password is required.</div>
+        </div>
+
+        <div class="row-between">
+          <label style="display:flex;align-items:center;gap:.4rem;color:var(--slate);cursor:pointer;">
+            <input type="checkbox" name="remember" value="1" style="accent-color:var(--trace-green);"> Keep me signed in
+          </label>
+          <a href="#" class="link-accent">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn-primary">Start tracking</button>
+      </form>
+
+      <div class="divider">or</div>
+
+      <p class="switch-line">New to PackTrace? <a href="{% url 'register' %}" class="link-accent">Create an account</a></p>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ============================================================
+   PACKTRACE — shared front-end behaviour
+   ============================================================ */
+function validateField(field, testFn, message){
+  const wrap = field.closest('.field');
+  const errorEl = wrap.querySelector('.field-error');
+  const ok = testFn(field.value.trim());
+  wrap.classList.toggle('has-error', !ok);
+  if(errorEl && message) errorEl.textContent = message;
+  return ok;
+}
+
+function initAuthForm(formId, rules){
+  const form = document.getElementById(formId);
+  if(!form) return;
+  form.addEventListener('submit', (e) => {
+    let allOk = true;
+    rules.forEach(rule => {
+      const field = document.getElementById(rule.id);
+      if(!field) return;
+      const ok = validateField(field, rule.test, rule.message);
+      if(!ok) allOk = false;
+    });
+    if(!allOk){
+      e.preventDefault();
+    } else {
+      const btn = form.querySelector('.btn-primary');
+      btn.textContent = 'Please wait…';
+      btn.disabled = true;
+      form.submit();
+    }
+  });
+
+  // clear error state as the person types
+  rules.forEach(rule => {
+    const field = document.getElementById(rule.id);
+    if(!field) return;
+    field.addEventListener('input', () => field.closest('.field').classList.remove('has-error'));
+  });
+}
+
+const notEmpty = v => v.length > 0;
+const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+initAuthForm('login-form', [
+  { id:'email', test: v => notEmpty(v) && isEmail(v), message:'Enter a valid email address.' },
+  { id:'password', test: notEmpty, message:'Password is required.' }
+]);
+
+const passwordInput = document.getElementById('password');
+const passwordVisibilityToggle = document.getElementById('password-visibility-toggle');
+passwordVisibilityToggle.addEventListener('click', () => {
+  const isVisible = passwordInput.type === 'password';
+  passwordInput.type = isVisible ? 'text' : 'password';
+  passwordVisibilityToggle.textContent = isVisible ? 'Hide' : 'Show';
+  passwordVisibilityToggle.setAttribute('aria-label', isVisible ? 'Hide password' : 'Show password');
+  passwordVisibilityToggle.setAttribute('title', isVisible ? 'Hide password' : 'Show password');
+  passwordVisibilityToggle.setAttribute('aria-pressed', String(isVisible));
+});
+</script>
+</body>
+</html>

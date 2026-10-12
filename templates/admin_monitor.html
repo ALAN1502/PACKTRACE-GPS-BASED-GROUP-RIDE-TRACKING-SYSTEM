@@ -1,0 +1,298 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Operations Center — PackTrace</title>
+<link rel="stylesheet" href="{% static 'css/packtrace.css' %}">
+<style>
+.admin-shell{ min-height:100vh; display:flex; flex-direction:column; background:var(--asphalt); }
+.admin-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:1.5rem;
+  padding:1.5rem;
+  max-width:1400px;
+  margin:0 auto;
+  width:100%;
+}
+.card{
+  background:var(--asphalt-raised);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  padding:1.4rem;
+  box-shadow:var(--shadow-card);
+}
+.card-head{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:1.2rem;
+  padding-bottom:.8rem;
+  border-bottom:1px solid var(--border);
+}
+.card-head h2{
+  font-family:'Rajdhani', sans-serif;
+  font-size:1.3rem;
+  margin:0;
+  color:var(--chalk);
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+.badge-admin{
+  background:rgba(242,169,59,.15);
+  border:1px solid rgba(242,169,59,.4);
+  color:var(--signal-amber);
+  padding:.2rem .6rem;
+  border-radius:999px;
+  font-size:.7rem;
+  font-weight:700;
+  text-transform:uppercase;
+}
+.badge-danger{
+  background:rgba(229,89,94,.15);
+  border:1px solid var(--danger);
+  color:var(--danger);
+  padding:.2rem .5rem;
+  border-radius:4px;
+  font-size:.7rem;
+  font-weight:700;
+}
+.badge-success{
+  background:rgba(62,207,142,.15);
+  border:1px solid var(--trace-green);
+  color:var(--trace-green);
+  padding:.2rem .5rem;
+  border-radius:4px;
+  font-size:.7rem;
+  font-weight:700;
+}
+.table-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+th{ text-align:left; color:var(--slate); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; padding:.6rem .8rem; border-bottom:1px solid var(--border); }
+td{ padding:.75rem .8rem; border-bottom:1px solid rgba(42,48,56,.6); color:var(--chalk); }
+tr:last-child td{ border-bottom:none; }
+.btn-sm{
+  padding:.35rem .7rem;
+  border-radius:var(--radius-sm);
+  font-size:.75rem;
+  font-weight:600;
+  border:none;
+}
+.btn-resolve{
+  background:var(--trace-green);
+  color:#08110D;
+}
+.btn-resolve:hover{ filter:brightness(1.1); }
+.status-dot{
+  width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:.4rem;
+}
+.dot-online{ background:var(--trace-green); box-shadow:0 0 6px var(--trace-green); }
+.dot-offline{ background:var(--slate-dim); }
+.dot-alert{ background:var(--danger); box-shadow:0 0 8px var(--danger); animation:pulse-ring 1.5s infinite; }
+
+@media (max-width: 900px){
+  .admin-grid{ grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="admin-shell">
+
+  <!-- Top bar -->
+  <header class="dash-topbar">
+    <div class="dash-topbar-left">
+      <div class="wordmark"><span class="pulse-dot"></span>PACKTRACE</div>
+      <span class="badge-admin">Admin Operations Monitor</span>
+      <a href="{% url 'dashboard' %}" class="link-accent" style="font-size:.85rem;">← Live Dashboard</a>
+      <a href="/admin/" target="_blank" class="link-muted" style="font-size:.85rem;">Django Admin ↗</a>
+    </div>
+    <div class="dash-topbar-right">
+      <a href="{% url 'logout' %}" class="btn-end">Logout</a>
+      <div class="avatar" style="background:var(--danger);" title="Admin">{{ profile.avatar_initials|default:"AD" }}</div>
+    </div>
+  </header>
+
+  <!-- Stat strip -->
+  <section class="stat-strip">
+    <div class="stat-card"><span>Active Groups</span><b class="accent">{{ active_packs.count }}</b></div>
+    <div class="stat-card"><span>Online Riders</span><b style="color:var(--trace-green);">{{ online_riders.count }}</b></div>
+    <div class="stat-card"><span>Disconnected Riders</span><b style="color:var(--slate);">{{ disconnected_riders.count }}</b></div>
+    <div class="stat-card"><span>Active SOS Alerts</span><b style="color:var(--danger);">{{ active_alerts.count }}</b></div>
+  </section>
+
+  <!-- Main Content Grid -->
+  <div class="admin-grid">
+
+    <!-- Active SOS & Emergency Alerts -->
+    <div class="card" style="grid-column: 1 / -1; border-color: rgba(229,89,94,.4);">
+      <div class="card-head">
+        <h2><span class="status-dot dot-alert"></span>Active SOS & Deviation Alerts</h2>
+        <span class="badge-danger">{{ active_alerts.count }} Urgent</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Rider</th>
+              <th>Group</th>
+              <th>Type</th>
+              <th>Details</th>
+              <th>Coordinates</th>
+              <th>Reported</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in active_alerts %}
+            <tr id="alert-row-{{ a.id }}">
+              <td><b>{{ a.rider.get_full_name|default:a.rider.username }}</b></td>
+              <td>{{ a.pack.name }}</td>
+              <td><span class="badge-danger">{{ a.get_alert_type_display }}</span></td>
+              <td>{% if a.message %}{{ a.message }}{% else %}No message provided{% endif %}</td>
+              <td class="mono">{% if a.latitude %}{{ a.latitude|floatformat:4 }}, {{ a.longitude|floatformat:4 }}{% else %}GPS Pending{% endif %}</td>
+              <td>{{ a.created_at|timesince }} ago</td>
+              <td>
+                <button class="btn-sm" style="background:var(--route-blue);color:#fff;" onclick="acknowledgeAlert({{ a.id }})" {% if a.status == 'ACKNOWLEDGED' %}disabled{% endif %}>Acknowledge</button>
+                <button class="btn-sm btn-resolve" onclick="resolveAlert({{ a.id }})">Resolve</button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" style="text-align:center; color:var(--slate); padding:1.5rem;">
+                No active SOS alerts. All riders reported safe.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Active Riding Packs -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Active & Monitored Packs</h2>
+        <span class="badge-admin">{{ active_packs.count }} Active</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pack Name</th>
+              <th>Destination</th>
+              <th>Lead Rider</th>
+              <th>Riders</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in active_packs %}
+            <tr>
+              <td><a href="/dashboard/{{ p.id }}/" class="link-accent"><b>{{ p.name }}</b></a></td>
+              <td>{{ p.destination_name }}</td>
+              <td>{{ p.creator.get_full_name|default:p.creator.username }}</td>
+              <td class="mono">{{ p.memberships.count }}</td>
+              <td><span class="badge-success">{{ p.get_status_display }}</span></td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" style="text-align:center; color:var(--slate);">No active packs currently.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Riders Connectivity & Disconnection Monitor -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Rider Connectivity Status</h2>
+        <span class="badge-admin">{{ total_riders_count }} Registered</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Rider</th>
+              <th>Vehicle</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Last Signal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in online_riders %}
+            <tr>
+              <td><span class="status-dot dot-online"></span><b>{{ r.full_name }}</b></td>
+              <td>{{ r.ride_type }}</td>
+              <td class="mono">{{ r.phone|default:"-" }}</td>
+              <td><span class="badge-success">Online</span></td>
+              <td>{{ r.last_active|timesince }} ago</td>
+            </tr>
+            {% endfor %}
+            {% for r in disconnected_riders %}
+            <tr>
+              <td><span class="status-dot dot-offline"></span><span style="color:var(--slate);">{{ r.full_name }}</span></td>
+              <td>{{ r.ride_type }}</td>
+              <td class="mono">{{ r.phone|default:"-" }}</td>
+              <td><span class="badge-danger" style="background:rgba(91,97,105,.2);border-color:var(--slate-dim);color:var(--slate);">Disconnected</span></td>
+              <td>{{ r.last_active|timesince }} ago</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function acknowledgeAlert(alertId){
+  if(!confirm('Acknowledge this SOS alert?')) return;
+  fetch('/api/alerts/' + alertId + '/acknowledge/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.success){
+      alert('Alert acknowledged! Group has been notified.');
+      window.location.reload();
+    } else {
+      alert(data.error || 'Failed to acknowledge alert');
+    }
+  })
+  .catch(err => alert('Network error acknowledging alert'));
+}
+
+function resolveAlert(alertId){
+  if(!confirm('Confirm marking this SOS alert as resolved?')) return;
+  fetch('/api/alerts/' + alertId + '/resolve/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.success){
+      const row = document.getElementById('alert-row-' + alertId);
+      if(row) row.style.display = 'none';
+      alert('Alert successfully resolved!');
+      window.location.reload();
+    } else {
+      alert(data.error || 'Failed to resolve alert');
+    }
+  })
+  .catch(err => alert('Network error resolving alert'));
+}
+</script>
+</body>
+</html>

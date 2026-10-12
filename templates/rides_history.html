@@ -1,0 +1,97 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ride History — PackTrace</title>
+<link rel="stylesheet" href="{% static 'css/packtrace.css' %}">
+<style>
+.history-shell{ min-height:100vh; display:flex; flex-direction:column; background:var(--asphalt); }
+.history-container{
+  max-width:1100px; margin:2rem auto; width:100%; padding:0 1.5rem;
+}
+.card{
+  background:var(--asphalt-raised);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  padding:1.5rem;
+  box-shadow:var(--shadow-card);
+}
+.card h1{
+  font-family:'Rajdhani', sans-serif;
+  font-size:1.6rem;
+  margin:0 0 1.2rem;
+  color:var(--chalk);
+}
+table{ width:100%; border-collapse:collapse; font-size:.88rem; }
+th{ text-align:left; color:var(--slate); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; padding:.7rem .8rem; border-bottom:1px solid var(--border); }
+td{ padding:.8rem; border-bottom:1px solid rgba(42,48,56,.6); color:var(--chalk); }
+.badge{ padding:.2rem .55rem; border-radius:4px; font-size:.72rem; font-weight:700; }
+.badge-lead{ background:rgba(62,207,142,.15); color:var(--trace-green); border:1px solid var(--trace-green-dim); }
+.badge-rider{ background:rgba(76,126,255,.15); color:var(--route-blue); border:1px solid rgba(76,126,255,.4); }
+</style>
+</head>
+<body>
+<div class="history-shell">
+
+  <!-- Top bar -->
+  <header class="dash-topbar">
+    <div class="dash-topbar-left">
+      <div class="wordmark"><span class="pulse-dot"></span>PACKTRACE</div>
+      <a href="{% url 'dashboard' %}" class="link-accent" style="font-size:.85rem;">← Back to Dashboard</a>
+    </div>
+    <div class="dash-topbar-right">
+      <a href="{% url 'logout' %}" class="btn-end">Logout</a>
+      <div class="avatar">{{ profile.avatar_initials|default:"PT" }}</div>
+    </div>
+  </header>
+
+  <div class="history-container">
+    <div class="card">
+      <h1>Your Ride History</h1>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Pack Name</th>
+              <th>Start Location</th>
+              <th>Destination</th>
+              <th>Planned Distance</th>
+              <th>Travelled</th>
+              <th>Duration</th>
+              <th>Your Role</th>
+              <th>Status</th>
+              <th>Pack Members</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rides %}
+            <tr>
+              <td><b>{{ r.name }}</b></td>
+              <td class="mono">{{ r.start_location }}</td>
+              <td>{{ r.destination }}</td>
+              <td>{% if r.route_distance_km is not None %}{{ r.route_distance_km }} km{% else %}Not recorded{% endif %}</td>
+              <td>{{ r.travelled_distance_km }} km</td>
+              <td>{% if r.duration_minutes is not None %}{{ r.duration_minutes }} min{% else %}Not recorded{% endif %}</td>
+              <td>
+                <span class="badge {% if r.role == 'Lead Rider' %}badge-lead{% else %}badge-rider{% endif %}">{{ r.role }}</span>
+              </td>
+              <td>{{ r.status }}</td>
+              <td class="mono">{{ r.total_riders }} riders</td>
+              <td><a href="/dashboard/{{ r.id }}/" class="link-accent">Open Map →</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="10" style="text-align:center; color:var(--slate); padding:2rem;">No completed rides yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

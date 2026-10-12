@@ -1,0 +1,2202 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ active_pack.name|default:"PackTrace Dashboard" }} — PackTrace</title>
+<link rel="stylesheet" href="{% static 'css/packtrace.css' %}">
+<style>
+.btn-sos{
+  background:rgba(229,89,94,.15);
+  border:1px solid var(--danger);
+  color:var(--danger);
+  padding:.45rem .85rem;
+  border-radius:var(--radius-sm);
+  font-weight:700;
+  font-size:.82rem;
+  transition:all .15s;
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+}
+.btn-sos:hover{
+  background:var(--danger);
+  color:#fff;
+  box-shadow:0 0 12px rgba(229,89,94,.5);
+}
+.btn-create-group{
+  background:rgba(62,207,142,.12);
+  border:1px solid var(--trace-green-dim);
+  color:var(--trace-green);
+  padding:.45rem .8rem;
+  border-radius:var(--radius-sm);
+  font-size:.82rem;
+  font-weight:700;
+  display:inline-flex;
+  align-items:center;
+  gap:.3rem;
+  transition:background .15s;
+}
+.btn-create-group:hover{ background:rgba(62,207,142,.22); }
+.code-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  background:var(--asphalt-card);
+  border:1px solid var(--border);
+  color:var(--chalk);
+  padding:.35rem .65rem;
+  border-radius:var(--radius-sm);
+  font-size:.78rem;
+  font-family:'JetBrains Mono', monospace;
+}
+.code-pill b{ color:var(--trace-green); letter-spacing:.05em; }
+.code-pill button{
+  background:transparent; border:none; color:var(--slate); padding:0; cursor:pointer; font-size:.75rem;
+}
+.code-pill button:hover{ color:var(--trace-green); }
+.admin-link-pill{
+  background:rgba(242,169,59,.15);
+  border:1px solid rgba(242,169,59,.4);
+  color:var(--signal-amber);
+  padding:.35rem .75rem;
+  border-radius:var(--radius-sm);
+  font-size:.78rem;
+  font-weight:600;
+  text-decoration:none;
+}
+.alert-banner{
+  background:rgba(229,89,94,.15);
+  border-bottom:1px solid var(--danger);
+  color:var(--danger);
+  padding:.6rem 1.6rem;
+  font-size:.85rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+/* Modal styles matching asphalt design */
+.modal-overlay{
+  position:fixed; inset:0; z-index:1000;
+  background:rgba(8,17,13,.75);
+  backdrop-filter:blur(6px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:1rem;
+}
+.modal-overlay.open{ display:flex; }
+.modal-box{
+  background:var(--asphalt-raised);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  padding:2rem;
+  width:100%; max-width:440px;
+  box-shadow:var(--shadow-card);
+}
+.modal-box h2{
+  font-family:'Rajdhani', sans-serif;
+  margin:0 0 .4rem;
+  font-size:1.6rem;
+  color:var(--chalk);
+}
+.modal-box p{ color:var(--slate); font-size:.88rem; margin:0 0 1.5rem; }
+.modal-actions{ display:flex; gap:.8rem; margin-top:1.5rem; }
+.map-picker-box{ max-width:900px; padding:1.25rem; }
+.map-picker-map{ position:relative; height:min(55vh,520px); min-height:300px; border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+.map-picker-status{ min-height:2.8rem; padding:.75rem 0 0; color:var(--slate); font-size:.82rem; }
+.map-error{ position:absolute; z-index:500; left:1rem; max-width:min(32rem,calc(100% - 2rem)); padding:.65rem .8rem; border-radius:var(--radius-sm); font-size:.78rem; }
+.map-error{ display:none; top:1rem; background:rgba(229,89,94,.94); color:#fff; }
+.map-error.visible{ display:block; }
+.rider-location-status{ margin-top:auto; padding:1rem 1.3rem; border-top:1px solid var(--border); background:var(--asphalt); }
+.rider-location-status h3{ margin:0 0 .45rem; color:var(--slate); font-size:.68rem; font-weight:700; letter-spacing:.08em; }
+.rider-location-status .gps-status{ display:none; color:var(--slate); font-size:.78rem; line-height:1.5; overflow-wrap:anywhere; }
+.rider-location-status .gps-status.visible{ display:block; }
+.rider-location-status .gps-status.visible{ color:var(--signal-amber); }
+.destination-details{ display:none; color:var(--slate); font-size:.78rem; line-height:1.6; margin-top:.5rem; }
+.destination-details.visible{ display:block; }
+#route-summary{ display:block; color:var(--trace-green); margin-top:.2rem; }
+.ride-create-status{ display:none; color:var(--signal-amber); font-size:.78rem; line-height:1.5; margin:-.8rem 0 1rem; }
+.ride-create-status.visible{ display:block; }
+.btn-map-select{ width:100%; margin-top:.65rem; background:rgba(76,126,255,.12); border:1px solid rgba(76,126,255,.4); color:var(--chalk); padding:.7rem .85rem; border-radius:var(--radius-sm); font-weight:700; }
+.btn-map-select:hover{ background:rgba(76,126,255,.2); }
+.destination-error{ display:none; color:var(--danger); font-size:.78rem; margin-top:.45rem; }
+.destination-error.visible{ display:block; }
+.btn-cancel{
+  flex:1; background:transparent; border:1px solid var(--border); color:var(--slate);
+  padding:.8rem; border-radius:var(--radius-sm); font-weight:600;
+}
+.btn-cancel:hover{ background:var(--asphalt-card); color:var(--chalk); }
+@keyframes pulseSos {
+  0% { box-shadow: 0 0 0 0 rgba(229,89,94, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(229,89,94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(229,89,94, 0); }
+}
+.pulse-sos {
+  animation: pulseSos 1.5s infinite;
+  border-color: var(--danger) !important;
+  background: rgba(229,89,94,.15) !important;
+}
+.sos-toast-stack{
+  position:fixed; z-index:2000; top:max(1rem,env(safe-area-inset-top)); right:max(1rem,env(safe-area-inset-right));
+  display:grid; gap:.75rem; width:min(26rem,calc(100vw - 2rem)); pointer-events:none;
+}
+.sos-toast{
+  position:relative; display:grid; grid-template-columns:1fr auto; gap:.55rem .75rem;
+  padding:1rem 1rem .9rem; color:var(--chalk); background:var(--asphalt-raised);
+  border:1px solid var(--danger); border-left:5px solid var(--danger); border-radius:var(--radius-sm);
+  box-shadow:0 12px 34px rgba(0,0,0,.45); pointer-events:auto; animation:sosToastIn .2s ease-out;
+}
+.sos-toast-heading{ grid-column:1; color:var(--danger); font-weight:800; font-size:.9rem; }
+.sos-toast-close{ grid-column:2; grid-row:1; align-self:start; background:transparent; border:0; color:var(--slate); font-size:1.25rem; cursor:pointer; line-height:1; }
+.sos-toast-sender{ grid-column:1/-1; font-weight:700; }
+.sos-toast-label{ grid-column:1/-1; color:var(--signal-amber); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.sos-toast-message{ grid-column:1/-1; overflow-wrap:anywhere; white-space:pre-wrap; padding:.65rem .75rem; border-radius:var(--radius-sm); background:var(--asphalt); }
+.sos-toast-footer{ grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; gap:.75rem; color:var(--slate); font-size:.75rem; }
+.sos-toast-location{ color:var(--route-blue); background:transparent; border:0; padding:0; text-decoration:underline; cursor:pointer; }
+@keyframes sosToastIn{ from{ opacity:0; transform:translateY(-.4rem); } to{ opacity:1; transform:translateY(0); } }
+@media (max-width:480px){ .sos-toast-stack{ top:max(.65rem,env(safe-area-inset-top)); right:.65rem; width:calc(100vw - 1.3rem); } }
+</style>
+</head>
+<body>
+<div class="dash-shell">
+  <div id="sos-toast-container" class="sos-toast-stack" aria-live="assertive" aria-relevant="additions" aria-label="Emergency alerts"></div>
+
+  <!-- Active Alert Banner if SOS exists -->
+  {% if active_alerts %}
+  <div class="alert-banner" id="sos-banner">
+    <div>
+      <b>🚨 ACTIVE SOS ALERT:</b>
+      {% for a in active_alerts %}
+        <span style="color:{{ a.rider_color }};">Rider {{ a.ride_member__rider_number }} · {{ a.ride_member__user__first_name|default:a.ride_member__user__username }}: {{ a.message }} &nbsp;|&nbsp; </span>
+      {% endfor %}
+    </div>
+    {% if is_admin %}
+    <a href="{% url 'admin_monitor' %}" class="btn-sos" style="padding:.2rem .6rem;font-size:.75rem;">Manage in Admin</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Top bar -->
+  <header class="dash-topbar">
+    <div class="dash-topbar-left">
+      <div class="wordmark"><span class="pulse-dot"></span>PACKTRACE</div>
+      <select class="pack-select" id="pack-select" aria-label="Active pack" onchange="if(this.value) window.location.href='/dashboard/' + this.value + '/';">
+        {% for p in packs %}
+          <option value="{{ p.id }}" {% if p.id == active_pack.id %}selected{% endif %}>{{ p.name }}</option>
+        {% empty %}
+          <option value="" selected disabled>No rides yet</option>
+        {% endfor %}
+      </select>
+
+      {% if active_pack %}
+      <span class="code-pill" title="Group Join Code">
+        JOIN: <b id="join-code-text">{{ active_pack.join_code }}</b>
+        <button onclick="copyJoinCode('{{ active_pack.join_code }}')" title="Copy Join Code">📋</button>
+      </span>
+      {% endif %}
+
+      <button class="btn-create-group" onclick="openCreateGroupModal()">+ Create</button>
+      <button class="btn-create-group" style="background:rgba(76,126,255,.12);border-color:rgba(76,126,255,.35);color:var(--route-blue);" onclick="openJoinGroupModal()">→ Join with Code</button>
+      
+      {% if active_pack and active_pack.status == 'READY' %}
+        <button id="btn-start-ride" class="btn-create-group" style="background:var(--trace-green);color:#08110D;" onclick="startRideNow({{ active_pack.id }})">▶ Start Ride</button>
+      {% elif active_pack and active_pack.status == 'ACTIVE' %}
+        <span class="live-pill" id="live-pill-indicator"><span class="pulse-dot" style="width:6px;height:6px;"></span>Live</span>
+      {% else %}
+        <span class="live-pill" id="live-pill-indicator">No active ride</span>
+      {% endif %}
+    </div>
+    <div class="dash-topbar-right">
+      {% if is_admin %}
+        <a href="{% url 'admin_monitor' %}" class="admin-link-pill" title="Open Admin Monitor">⚙ Admin Monitor</a>
+      {% endif %}
+      <button class="btn-sos" onclick="triggerSosModal()">🚨 SOS</button>
+      {% if active_pack and active_pack.status == 'ACTIVE' %}
+        <button class="btn-end" onclick="endRideNow({{ active_pack.id }})" title="Complete ride for this group">End ride</button>
+      {% else %}
+        <a href="{% url 'logout' %}" class="btn-end">Sign out</a>
+      {% endif %}
+      <div class="avatar" title="{{ profile.full_name|default:user.username }}">{{ profile.avatar_initials|default:"PT" }}</div>
+    </div>
+  </header>
+
+  <!-- Stat strip -->
+  <section class="stat-strip{% if active_pack and active_pack.status == 'ACTIVE' or active_pack and active_pack.status == 'READY' %} has-route-stats{% endif %}">
+    <div class="stat-card"><span>Riders online</span><b class="accent" id="stat-online-riders">{{ online_riders_count }} / {{ total_riders_count }}</b></div>
+    <div class="stat-card"><span>Pack avg speed</span><b id="stat-avg-speed">{{ avg_speed_kmh }} km/h</b></div>
+    <div class="stat-card"><span>Elapsed time</span><b id="stat-elapsed-time">{{ elapsed_display }}</b></div>
+    <div class="stat-card"><span>Next waypoint</span><b id="stat-waypoint">{% if active_pack and active_pack.status == 'ACTIVE' and active_pack.destination_name %}{{ active_pack.destination_name }}{% else %}No active destination{% endif %}</b></div>
+    {% if active_pack and active_pack.status == 'ACTIVE' or active_pack and active_pack.status == 'READY' %}
+    <div class="stat-card"><span>Planned distance</span><b id="stat-planned-distance">{% if active_pack.route_distance_meters %}{{ active_pack.route_distance_meters|floatformat:0 }} m{% else %}--{% endif %}</b></div>
+    <div class="stat-card"><span>Route duration</span><b id="stat-route-duration">{% if active_pack.route_duration_seconds %}{{ active_pack.route_duration_seconds|floatformat:0 }} sec{% else %}--{% endif %}</b></div>
+    {% endif %}
+    {% if active_pack and active_pack.status == 'ACTIVE' %}
+    <div class="stat-card"><span>Current location</span><b id="stat-current-location">Waiting for GPS</b></div>
+    <div class="stat-card"><span>Distance remaining</span><b id="stat-distance-remaining">--</b></div>
+    <div class="stat-card"><span>ETA</span><b id="stat-eta">--</b></div>
+    <div class="stat-card"><span>Travelled</span><b id="stat-distance-travelled">0 m</b></div>
+    {% endif %}
+  </section>
+
+  <!-- Main: rider roster + map -->
+  <div class="dash-main">
+    <aside class="rider-panel">
+      <div class="rider-panel-head">
+        <span>Riders</span>
+        <span id="rider-count-badge">{{ online_riders_count }} online</span>
+      </div>
+      <ul id="rider-list">
+        {% if members %}
+          {% for m in members %}
+          <li class="rider-item {% if forloop.first %}selected{% endif %}" id="rider-item-{{ m.id }}" data-rider-id="{{ m.id }}">
+            <span class="rider-dot" id="dot-{{ m.id }}" style="background:{{ m.color }};color:{{ m.color }};"></span>
+            <div class="rider-info">
+              <div class="rider-identity" id="identity-{{ m.id }}" style="color:{{ m.color }};">Rider {{ m.rider_number }}</div>
+              <div class="rider-name">
+                <span id="name-{{ m.id }}">{{ m.name }}{% if m.is_current_user %} (You){% endif %}</span>
+                <span id="status-badge-{{ m.id }}" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px;letter-spacing:0.04em;{% if m.status == 'DISCONNECTED' or not m.is_online %}background:rgba(242,169,59,.15);color:var(--signal-amber);border:1px solid rgba(242,169,59,.3);{% else %}background:rgba(62,207,142,.15);color:var(--trace-green);border:1px solid rgba(62,207,142,.3);{% endif %}">
+                  {% if m.status == 'DISCONNECTED' or not m.is_online %}DISCONNECTED{% else %}ACTIVE{% endif %}
+                </span>
+              </div>
+              <div class="rider-meta">{{ m.vehicle }} · {{ m.role }}</div>
+            </div>
+            <div class="rider-speed">
+              <span id="speed-label-{{ m.id }}">{% if m.status == 'DISCONNECTED' or not m.is_connected %}Last Seen{% else %}Speed{% endif %}</span>
+              <span id="speed-{{ m.id }}" class="mono">
+                {% if m.status == 'DISCONNECTED' or not m.is_connected %}
+                  <span style="font-size: 0.75rem;" id="last-seen-{{ m.id }}">{% if m.last_seen %}{{ m.last_seen|date:"H:i" }}{% else %}Unknown{% endif %}</span>
+                {% else %}
+                  {% if m.speed is not None %}{{ m.speed|floatformat:0 }} km/h{% else %}-- km/h{% endif %}
+                {% endif %}
+              </span>
+            </div>
+            <div id="last-loc-{{ m.id }}" style="display: {% if m.status == 'DISCONNECTED' or not m.is_connected %}block{% else %}none{% endif %}; font-size: 0.7rem; color: #888; margin-top: 4px; text-align: right;">
+              {% if m.latitude != None and m.longitude != None %}Rider {{ m.rider_number }} · Loc: {{ m.latitude|floatformat:4 }}, {{ m.longitude|floatformat:4 }}{% endif %}
+            </div>
+          </li>
+          {% endfor %}
+
+        {% else %}
+          <li class="rider-item rider-empty">No riders currently active</li>
+        {% endif %}
+      </ul>
+      <section class="rider-location-status" aria-labelledby="current-location-heading">
+        <h3 id="current-location-heading">CURRENT LOCATION</h3>
+        <div id="gps-status" class="gps-status" role="status" aria-live="polite"></div>
+      </section>
+    </aside>
+
+    <div class="map-area">
+      <div id="map"></div>
+      <div id="map-error" class="map-error" role="alert"></div>
+      <button type="button" id="center-current-location" class="map-location-button" onclick="centerOnCurrentLocation()" title="Center map on your current location" aria-label="Center map on your current location">📍 Current Location</button>
+      <div class="map-legend">
+        <div><span class="sw" style="background:#4285F4;"></span>Planned route</div>
+        <div><span class="sw" style="background:#3ECF8E;"></span>Rider breadcrumb</div>
+        <div class="route-attribution">Route data <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors (ODbL)</a> · <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal-overlay" id="create-group-modal">
+  <div class="modal-box">
+    <h2>Create Riding Group</h2>
+    <p>Set up a new pack. You will be designated as the LEADER and receive a unique join code.</p>
+    <div class="ride-create-status" id="ride-create-status" role="status" aria-live="polite"></div>
+
+    <form id="create-group-form" onsubmit="handleCreateGroupSubmit(event)">
+      <div class="field">
+        <label for="new-group-name">Group / Ride Name</label>
+        <input type="text" id="new-group-name" placeholder="Ride name" required>
+      </div>
+
+      <div class="field">
+        <label for="new-group-dest">Destination</label>
+        <input type="text" id="new-group-dest" placeholder="Enter destination">
+        <input type="hidden" id="new-group-dest-lat">
+        <input type="hidden" id="new-group-dest-lng">
+        <button type="button" class="btn-map-select" onclick="openDestinationMapPicker()">📍 Select on Map</button>
+        <div class="destination-details" id="destination-details">
+          <span id="destination-coordinates"></span>
+          <span id="route-summary"></span>
+          <button type="button" class="btn-map-select" onclick="openDestinationMapPicker()">Change Location</button>
+        </div>
+        <div class="destination-error" id="destination-error" role="alert">Please select a destination.</div>
+      </div>
+
+      <div class="field">
+        <label for="new-group-desc">Description</label>
+        <input type="text" id="new-group-desc" placeholder="High elevation morning ride with sweeping turns">
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeCreateGroupModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="flex:1;">Create & Lead</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Destination Map Picker reuses the initialized Google Map -->
+<div class="modal-overlay" id="destination-map-modal">
+  <div class="modal-box map-picker-box">
+    <h2>Select Destination</h2>
+    <p>Click anywhere on the map to place the destination marker.</p>
+    <div class="map-picker-map" id="destination-map-host"></div>
+    <div class="map-picker-status" id="destination-map-status" aria-live="polite">Choose a location on the map.</div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closeDestinationMapPicker()">Cancel</button>
+      <button type="button" class="btn-primary" id="confirm-destination-button" onclick="confirmDestinationSelection()" disabled>Confirm Location</button>
+    </div>
+  </div>
+</div>
+
+<!-- Join Group Modal -->
+<div class="modal-overlay" id="join-group-modal">
+  <div class="modal-box">
+    <h2>Join Riding Group</h2>
+    <p>Enter the 6-character Join Code shared by the group Leader.</p>
+
+    <form id="join-group-form" onsubmit="handleJoinGroupSubmit(event)">
+      <div class="field">
+        <label for="input-join-code">Join Code</label>
+        <input type="text" id="input-join-code" placeholder="e.g. PT7K4Q" maxlength="12" style="text-transform:uppercase;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;font-size:1.1rem;" required>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeJoinGroupModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="flex:1;background:var(--route-blue);">Join Group</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   PACKTRACE — Live map & real GPS tracking via WebSocket
+  Map library: Google Maps JavaScript API
+   All rider positions, routes, and speeds come from the DB
+   and are updated in real-time via WebSocket broadcasts.
+   ============================================================ */
+const RIDER_COLORS = ['#4C7EFF', '#E5595E', '#3ECF8E', '#F2A93B', '#B98CE0', '#4FD0E0', '#F0D64E', '#F07CB5'];
+
+{% if active_pack and active_pack.planned_route %}
+const ROUTE = {{ active_pack.planned_route|safe }};
+{% else %}
+const ROUTE = [];
+{% endif %}
+{% if active_pack and active_pack.route_distance_meters %}
+const STORED_ROUTE_DISTANCE_METERS = {{ active_pack.route_distance_meters }};
+{% else %}
+const STORED_ROUTE_DISTANCE_METERS = null;
+{% endif %}
+{% if active_pack and active_pack.route_duration_seconds %}
+const STORED_ROUTE_DURATION_SECONDS = {{ active_pack.route_duration_seconds }};
+{% else %}
+const STORED_ROUTE_DURATION_SECONDS = null;
+{% endif %}
+
+const GOOGLE_MAP_STYLES = [
+  { elementType: 'geometry', stylers: [{ color: '#1b1f24' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#aeb6c0' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1b1f24' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#39414b' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#20252b' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#252b31' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#343b44' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1b1f24' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2b323a' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#101820' }] }
+];
+
+const riderData = [
+  {% if members %}
+    {% for m in members %}
+      {
+        id: "{{ m.id }}",
+        user_id: "{{ m.user_id }}",
+        rider_number: {{ m.rider_number }},
+        name: "{{ m.name|escapejs }}",
+        initials: "{{ m.initials|escapejs }}",
+        role: "{{ m.role|escapejs }}",
+        vehicle: "{{ m.vehicle|escapejs }}",
+        color: "{{ m.color|escapejs }}",
+        latitude: {{ m.latitude|default:"null" }},
+        longitude: {{ m.longitude|default:"null" }},
+        speed: {% if m.speed is not None %}{{ m.speed }}{% else %}null{% endif %},
+        is_connected: {% if m.is_connected %}true{% else %}false{% endif %}
+      },
+    {% endfor %}
+  {% endif %}
+];
+
+{% if active_pack and active_pack.status == 'ACTIVE' or active_pack and active_pack.status == 'READY' %}
+{% if active_pack.destination_latitude is not None and active_pack.destination_longitude is not None %}
+const DESTINATION_POSITION = { lat: Number('{{ active_pack.destination_latitude }}'), lng: Number('{{ active_pack.destination_longitude }}') };
+{% else %}
+const DESTINATION_POSITION = null;
+{% endif %}
+{% else %}
+const DESTINATION_POSITION = null;
+{% endif %}
+{% if active_pack and active_pack.start_latitude is not None and active_pack.start_longitude is not None %}
+const START_POSITION = { lat: Number('{{ active_pack.start_latitude }}'), lng: Number('{{ active_pack.start_longitude }}') };
+{% else %}
+const START_POSITION = null;
+{% endif %}
+{% if active_pack and active_pack.status == 'ACTIVE' %}
+const DESTINATION_NAME = '{{ active_pack.destination_name|escapejs }}';
+{% else %}
+const DESTINATION_NAME = '';
+{% endif %}
+const START_NAME = 'Ride start';
+
+let dashboardMapContext = null;
+const pendingRiderUpdates = {};
+let recentRouteId = null;
+const dashboardMapElement = document.getElementById('map');
+const dashboardMapPlaceholder = document.createComment('dashboard map position');
+dashboardMapElement.parentNode.insertBefore(dashboardMapPlaceholder, dashboardMapElement);
+let startMarker = null;
+let destinationMarker = null;
+let pendingDestination = null;
+let committedDestination = null;
+let reverseGeocodeRequest = 0;
+let destinationMapClickListener = null;
+let pendingRoute = null;
+let mapLoadError = '';
+let latestGpsLocation = null;
+let latestGpsLocationAt = 0;
+let currentRiderMarker = null;
+let myLocationMarker = null;
+let hasCenteredOnCurrentLocation = false;
+const ROUTE_API_URL = '{% url "calculate_route" %}';
+let plannedRoutePolyline = null;
+let plannedRouteData = ROUTE.map(normalizeRoutePoint).filter(Boolean);
+let plannedRouteDistanceMeters = STORED_ROUTE_DISTANCE_METERS;
+let plannedRouteDurationSeconds = STORED_ROUTE_DURATION_SECONDS;
+let routeOrigin = plannedRouteData.length ? plannedRouteData[0] : null;
+let selectedRoute = null;
+let traveledDistanceMeters = 0;
+
+function normalizeRiderId(value){
+  if(value === null || value === undefined) return '';
+  const cleaned = String(value).trim();
+  if(!cleaned) return '';
+  return cleaned.startsWith('r') || cleaned.startsWith('R') ? cleaned : `r${cleaned}`;
+}
+
+function isValidCoordinate(latitude, longitude){
+  if(latitude === null || latitude === undefined || longitude === null || longitude === undefined) return false;
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function setGoogleMapsError(message){
+  mapLoadError = message;
+  const errorEl = document.getElementById('map-error');
+  if(errorEl){
+    errorEl.textContent = message;
+    errorEl.classList.add('visible');
+  }
+}
+
+function setGpsStatus(message){
+  const statusEl = document.getElementById('gps-status');
+  if(!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.classList.toggle('visible', Boolean(message));
+}
+
+function getStableRiderColor(riderNumberValue){
+  const riderNumber = Math.max(1, Number(riderNumberValue) || 1);
+  if(riderNumber <= RIDER_COLORS.length) return RIDER_COLORS[riderNumber - 1];
+  const hue = (((riderNumber - RIDER_COLORS.length - 1) * 0.61803398875) % 1) * 360;
+  return `hsl(${hue} 76% 62%)`;
+}
+
+function buildRiderMarkerIcon(riderInfo){
+  const riderNumber = Number(riderInfo && riderInfo.rider_number) || 1;
+  const fillColor = (riderInfo && riderInfo.color) || getStableRiderColor(riderNumber);
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 11,
+    fillColor,
+    fillOpacity: 1,
+    strokeColor: '#F5F7FA',
+    strokeWeight: 2
+  };
+}
+
+function createRiderInfoWindow(riderInfo){
+  const content = document.createElement('div');
+  const identity = document.createElement('strong');
+  identity.textContent = `Rider ${riderInfo.rider_number || '?'} · ${riderInfo.name || riderInfo.initials || riderInfo.id}`;
+  const name = document.createElement('strong');
+  const role = String((riderInfo && riderInfo.role) || '').toUpperCase();
+  const displayRole = role === 'LEADER' ? 'Leader' : 'Rider';
+  name.textContent = `${displayRole}${riderInfo.is_current_user ? ' · You' : ''}`;
+  const speed = document.createElement('div');
+  speed.textContent = `Speed: ${riderInfo.speed !== null && riderInfo.speed !== undefined ? Math.round(riderInfo.speed) : '--'} km/h`;
+  content.append(identity, name, speed);
+  return content;
+}
+
+function addOrUpdateRiderMarker(ctx, riderInfo){
+  if(!ctx || !riderInfo || !isValidCoordinate(riderInfo.latitude, riderInfo.longitude)) return;
+  const { map, riderMarkers, riderTrails, riderInfoWindows } = ctx;
+  const id = normalizeRiderId(riderInfo.id || riderInfo.user_id || riderInfo.rider_id || '');
+  if(!id) return;
+  const isCurrentRider = id === currentRiderId;
+  const riderName = riderInfo.name || riderInfo.initials || id;
+  const displayName = `Rider ${riderInfo.rider_number || '?'} · ${riderName}${isCurrentRider ? ' (You)' : ''}`;
+  const position = { lat: Number(riderInfo.latitude), lng: Number(riderInfo.longitude) };
+  let marker = riderMarkers[id];
+
+  if(marker){
+    marker.setPosition(position);
+    marker.setTitle(displayName);
+    marker.setOpacity(riderInfo.is_connected === false ? 0.55 : 1);
+    marker.setIcon(buildRiderMarkerIcon({ ...riderInfo, id }));
+    marker.setLabel({ text: String(riderInfo.rider_number || '?'), color: '#101821', fontSize: '11px', fontWeight: '800' });
+    const infoWindow = riderInfoWindows[id];
+    if(infoWindow) infoWindow.setContent(createRiderInfoWindow({ ...riderInfo, id, name: riderName }));
+    const path = riderTrails[id].getPath();
+    const lastPosition = path.getLength() ? path.getAt(path.getLength() - 1) : null;
+    if(!lastPosition || lastPosition.lat() !== position.lat || lastPosition.lng() !== position.lng){
+      if(isCurrentRider && lastPosition){
+        traveledDistanceMeters += haversineMeters(
+          { lat: lastPosition.lat(), lng: lastPosition.lng() }, position
+        );
+      }
+      path.push(position);
+    }
+    if(isCurrentRider){
+      currentRiderMarker = marker;
+      updateRideRouteStats();
+    }
+    return;
+  }
+
+  const color = riderInfo.color || getStableRiderColor(riderInfo.rider_number);
+  marker = new google.maps.Marker({
+    map,
+    position,
+    title: `${displayName} · ${riderInfo.role || 'Rider'}`,
+    opacity: riderInfo.is_connected === false ? 0.55 : 1,
+    icon: buildRiderMarkerIcon({ ...riderInfo, id, color }),
+    label: { text: String(riderInfo.rider_number || '?'), color: '#101821', fontSize: '11px', fontWeight: '800' }
+  });
+  const infoWindow = new google.maps.InfoWindow({ content: createRiderInfoWindow({ ...riderInfo, id, name: riderName, color }) });
+  marker.addListener('click', () => infoWindow.open({ map, anchor: marker }));
+  riderMarkers[id] = marker;
+  if(isCurrentRider) currentRiderMarker = marker;
+  riderInfoWindows[id] = infoWindow;
+  riderTrails[id] = new google.maps.Polyline({
+    map,
+    path: [position],
+    strokeColor: color,
+    strokeOpacity: 0.8,
+    strokeWeight: 3
+  });
+  if(isCurrentRider) updateRideRouteStats();
+}
+
+function updateRiderOnMap(riderInfo){
+  if(!riderInfo || !isValidCoordinate(riderInfo.latitude, riderInfo.longitude)) return;
+  const riderId = normalizeRiderId(riderInfo.id || riderInfo.user_id || riderInfo.rider_id || '');
+  if(!riderId) return;
+  if(!dashboardMapContext){
+    pendingRiderUpdates[riderId] = riderInfo;
+    return;
+  }
+  console.log('[PackTrace] MAP LOCATION RECEIVED', {
+    riderId,
+    riderName: riderInfo.name || riderInfo.initials || 'Unknown',
+    latitude: riderInfo.latitude,
+    longitude: riderInfo.longitude,
+    mapReady: true,
+    markerCount: Object.keys(dashboardMapContext.riderMarkers).length
+  });
+  addOrUpdateRiderMarker(dashboardMapContext, riderInfo);
+}
+
+function normalizeRoutePoint(point){
+  const latitude = Array.isArray(point) ? point[0] : (point && (point.lat ?? point.latitude));
+  const longitude = Array.isArray(point) ? point[1] : (point && (point.lng ?? point.longitude));
+  return isValidCoordinate(latitude, longitude) ? { lat: Number(latitude), lng: Number(longitude) } : null;
+}
+
+function formatRouteDistance(meters){
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+}
+
+function formatRouteDuration(seconds){
+  const minutes = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}
+
+function haversineMeters(first, second){
+  const radians = degrees => degrees * Math.PI / 180;
+  const latitudeDelta = radians(second.lat - first.lat);
+  const longitudeDelta = radians(second.lng - first.lng);
+  const value = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(first.lat)) * Math.cos(radians(second.lat)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function calculateRoadRoute(origin, destination){
+  return fetch(ROUTE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      start_lat: Number(origin.lat),
+      start_lng: Number(origin.lng),
+      destination_lat: Number(destination.lat),
+      destination_lng: Number(destination.lng)
+    })
+  }).then(async response => {
+    const data = await response.json();
+    if(!response.ok || !data.success){
+      throw new Error(data.error || 'Unable to calculate route. Please try again.');
+    }
+    const path = data.route_coordinates.map(coordinate => ({
+      lng: Number(coordinate[0]),
+      lat: Number(coordinate[1])
+    }));
+    if(path.length < 2 || path.some(point => !isValidCoordinate(point.lat, point.lng))){
+      throw new Error('Unable to calculate route. Please try again.');
+    }
+    return {
+      path,
+      distanceMeters: Number(data.distance_meters),
+      durationSeconds: Number(data.duration_seconds),
+      origin: { lat: Number(origin.lat), lng: Number(origin.lng) }
+    };
+  }).catch(error => {
+    if(error instanceof TypeError){
+      throw new Error('Unable to calculate route. Please try again.');
+    }
+    throw error;
+  });
+}
+
+function applyPlannedRoute(route){
+  selectedRoute = route;
+  plannedRouteData = route.path;
+  plannedRouteDistanceMeters = route.distanceMeters;
+  plannedRouteDurationSeconds = route.durationSeconds;
+  routeOrigin = route.origin;
+  if(dashboardMapContext){
+    if(plannedRoutePolyline) plannedRoutePolyline.setMap(null);
+    plannedRoutePolyline = new google.maps.Polyline({
+      map: dashboardMapContext.map,
+      path: plannedRouteData,
+      strokeColor: '#4285F4',
+      strokeOpacity: 0.9,
+      strokeWeight: 5
+    });
+    const bounds = new google.maps.LatLngBounds();
+    plannedRouteData.forEach(point => bounds.extend(point));
+    dashboardMapContext.map.fitBounds(bounds, 48);
+  }
+  const summary = document.getElementById('route-summary');
+  if(summary){
+    summary.textContent = `Planned route: ${formatRouteDistance(route.distanceMeters)} · ${formatRouteDuration(route.durationSeconds)}`;
+  }
+  updateRideRouteStats();
+}
+
+function updateRideRouteStats(){
+  const plannedDistanceEl = document.getElementById('stat-planned-distance');
+  const routeDurationEl = document.getElementById('stat-route-duration');
+  const currentLocationEl = document.getElementById('stat-current-location');
+  const remainingEl = document.getElementById('stat-distance-remaining');
+  const etaEl = document.getElementById('stat-eta');
+  const traveledEl = document.getElementById('stat-distance-travelled');
+  if(plannedDistanceEl) plannedDistanceEl.textContent = plannedRouteDistanceMeters ? formatRouteDistance(plannedRouteDistanceMeters) : '--';
+  if(routeDurationEl) routeDurationEl.textContent = plannedRouteDurationSeconds ? formatRouteDuration(plannedRouteDurationSeconds) : '--';
+  if(currentLocationEl && latestGpsLocation){
+    currentLocationEl.textContent = `${latestGpsLocation.lat.toFixed(5)}, ${latestGpsLocation.lng.toFixed(5)}`;
+  }
+  if(!remainingEl && !etaEl && !traveledEl) return;
+
+  let routeLength = 0;
+  for(let index = 1; index < plannedRouteData.length; index++){
+    routeLength += haversineMeters(plannedRouteData[index - 1], plannedRouteData[index]);
+  }
+  let remainingLength = routeLength;
+  if(latestGpsLocation && plannedRouteData.length > 1){
+    let closestIndex = 0;
+    let closestDistance = Infinity;
+    plannedRouteData.forEach((point, index) => {
+      const distance = haversineMeters(latestGpsLocation, point);
+      if(distance < closestDistance){ closestDistance = distance; closestIndex = index; }
+    });
+    remainingLength = 0;
+    for(let index = closestIndex + 1; index < plannedRouteData.length; index++){
+      remainingLength += haversineMeters(plannedRouteData[index - 1], plannedRouteData[index]);
+    }
+  }
+  let remainingMeters = plannedRouteDistanceMeters;
+  if(routeLength && plannedRouteDistanceMeters){
+    remainingMeters = plannedRouteDistanceMeters * remainingLength / routeLength;
+  }
+  remainingMeters = Number.isFinite(remainingMeters) ? Math.max(0, remainingMeters) : null;
+  if(remainingEl) remainingEl.textContent = Number.isFinite(remainingMeters) ? formatRouteDistance(remainingMeters) : '--';
+  if(etaEl){
+    etaEl.textContent = Number.isFinite(remainingMeters) && plannedRouteDistanceMeters && plannedRouteDurationSeconds && plannedRouteDistanceMeters > 0
+      ? formatRouteDuration(plannedRouteDurationSeconds * remainingMeters / plannedRouteDistanceMeters)
+      : '--';
+  }
+  if(traveledEl) traveledEl.textContent = formatRouteDistance(traveledDistanceMeters);
+}
+
+function clearActiveRideState(){
+  if(dashboardMapContext){
+    Object.values(dashboardMapContext.riderMarkers || {}).forEach(marker => {
+      if(marker && marker.setMap) marker.setMap(null);
+    });
+    dashboardMapContext.riderMarkers = {};
+
+    Object.values(dashboardMapContext.riderTrails || {}).forEach(trail => {
+      if(trail && trail.setMap) trail.setMap(null);
+    });
+    dashboardMapContext.riderTrails = {};
+
+    Object.values(dashboardMapContext.riderInfoWindows || {}).forEach(info => {
+      if(info && typeof info.close === 'function') info.close();
+    });
+    dashboardMapContext.riderInfoWindows = {};
+
+    if(myLocationMarker){
+      myLocationMarker.setMap(null);
+      myLocationMarker = null;
+    }
+
+    if(plannedRoutePolyline){ plannedRoutePolyline.setMap(null); plannedRoutePolyline = null; }
+    if(startMarker){ startMarker.setMap(null); startMarker = null; }
+    if(destinationMarker){ destinationMarker.setMap(null); destinationMarker = null; }
+    if(dashboardMapContext.routeLine){ dashboardMapContext.routeLine.setMap(null); dashboardMapContext.routeLine = null; }
+    if(dashboardMapContext.map){
+      dashboardMapContext.map.setZoom(2);
+      dashboardMapContext.map.setCenter({ lat: 0, lng: 0 });
+    }
+  }
+
+  const riderList = document.getElementById('rider-list');
+  if(riderList){
+    riderList.innerHTML = '<li class="rider-item rider-empty">No active ride</li>';
+  }
+
+  if(Array.isArray(riderData)) riderData.length = 0;
+  Object.keys(pendingRiderUpdates).forEach(key => delete pendingRiderUpdates[key]);
+
+  const statOnline = document.getElementById('stat-online-riders');
+  if(statOnline) statOnline.textContent = '0 / 0';
+  const statAvgSpeed = document.getElementById('stat-avg-speed');
+  if(statAvgSpeed) statAvgSpeed.textContent = '0 km/h';
+  const statElapsed = document.getElementById('stat-elapsed-time');
+  if(statElapsed) statElapsed.textContent = '0m 00s';
+  const statWaypoint = document.getElementById('stat-waypoint');
+  if(statWaypoint) statWaypoint.textContent = 'No active destination';
+  const statPlannedDistance = document.getElementById('stat-planned-distance');
+  if(statPlannedDistance) statPlannedDistance.textContent = '--';
+  const statRouteDuration = document.getElementById('stat-route-duration');
+  if(statRouteDuration) statRouteDuration.textContent = '--';
+  const statCurrentLocation = document.getElementById('stat-current-location');
+  if(statCurrentLocation) statCurrentLocation.textContent = 'Waiting for GPS';
+  const statRemaining = document.getElementById('stat-distance-remaining');
+  if(statRemaining) statRemaining.textContent = '--';
+  const statEta = document.getElementById('stat-eta');
+  if(statEta) statEta.textContent = '--';
+  const statTravelled = document.getElementById('stat-distance-travelled');
+  if(statTravelled) statTravelled.textContent = '0 m';
+
+  currentGroupId = null;
+  recentRouteId = null;
+  plannedRouteData = [];
+  plannedRouteDistanceMeters = null;
+  plannedRouteDurationSeconds = null;
+  routeOrigin = null;
+  selectedRoute = null;
+  traveledDistanceMeters = 0;
+  latestGpsLocation = null;
+  latestGpsLocationAt = 0;
+  hasCenteredOnCurrentLocation = false;
+  pendingRoute = null;
+}
+
+function clearStaticRideMarkers(){
+  if(startMarker){ startMarker.setMap(null); startMarker = null; }
+  if(destinationMarker){ destinationMarker.setMap(null); destinationMarker = null; }
+}
+
+function setStartMarker(latitude, longitude){
+  if(!dashboardMapContext || !isValidCoordinate(latitude, longitude)) return;
+  const position = { lat: Number(latitude), lng: Number(longitude) };
+  if(startMarker){
+    startMarker.setPosition(position);
+    return;
+  }
+  startMarker = new google.maps.Marker({
+    map: dashboardMapContext.map,
+    position,
+    title: START_NAME,
+    label: { text: 'S', color: '#101821', fontSize: '12px', fontWeight: '700' },
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: '#F2A93B',
+      fillOpacity: 1,
+      strokeColor: '#261F00',
+      strokeWeight: 3
+    }
+  });
+}
+
+function initDashboardMap(riders){
+  const mapEl = document.getElementById('map');
+  if(!mapEl || !window.google || !google.maps || dashboardMapContext) return dashboardMapContext;
+
+  clearStaticRideMarkers();
+  const routePath = plannedRouteData;
+  const riderPositions = riders
+    .filter(rider => isValidCoordinate(rider.latitude, rider.longitude))
+    .map(rider => ({ lat: Number(rider.latitude), lng: Number(rider.longitude) }));
+  const hasCurrentLocation = isValidCoordinate(latestGpsLocation && latestGpsLocation.lat, latestGpsLocation && latestGpsLocation.lng);
+  const initialCenter = hasCurrentLocation ? latestGpsLocation : (riderPositions[0] || DESTINATION_POSITION || routePath[0]);
+  if(!initialCenter) return null;
+  const map = new google.maps.Map(mapEl, {
+    center: initialCenter,
+    zoom: 14,
+    styles: GOOGLE_MAP_STYLES,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true
+  });
+
+  let routeLine = null;
+  if(routePath.length > 1){
+    routeLine = new google.maps.Polyline({
+      map,
+      path: routePath,
+      strokeColor: '#4285F4',
+      strokeOpacity: 0.75,
+      strokeWeight: 3,
+      icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3 }, offset: '0', repeat: '12px' }]
+    });
+  }
+
+  const ctx = {
+    map,
+    riderMarkers: {},
+    riderTrails: {},
+    riderInfoWindows: {},
+    routeLine
+  };
+  plannedRoutePolyline = routeLine;
+  if(START_POSITION){
+    setStartMarker(START_POSITION.lat, START_POSITION.lng);
+  }
+  riders.forEach(rider => addOrUpdateRiderMarker(ctx, rider));
+  if(latestGpsLocation && isValidCoordinate(latestGpsLocation.lat, latestGpsLocation.lng)){
+    setMyLocationMarker(latestGpsLocation);
+  }
+
+  if(DESTINATION_POSITION){
+    destinationMarker = new google.maps.Marker({
+      map,
+      position: DESTINATION_POSITION,
+      title: DESTINATION_NAME || 'Destination',
+      label: { text: 'D', color: '#F9FAFB', fontSize: '12px', fontWeight: '700' },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 10,
+        fillColor: '#E5595E',
+        fillOpacity: 1,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 3
+      }
+    });
+  }
+
+  const riderBounds = new google.maps.LatLngBounds();
+  riderPositions.forEach(position => riderBounds.extend(position));
+  if(riderPositions.length > 1){
+    map.fitBounds(riderBounds, 64);
+    hasCenteredOnCurrentLocation = true;
+  } else if(riderPositions.length === 1 || hasCurrentLocation){
+    map.setCenter(hasCurrentLocation ? latestGpsLocation : riderBounds.getCenter());
+    map.setZoom(14);
+    hasCenteredOnCurrentLocation = hasCurrentLocation;
+  } else if(routePath.length > 1 || DESTINATION_POSITION){
+    const bounds = new google.maps.LatLngBounds();
+    routePath.forEach(position => bounds.extend(position));
+    if(DESTINATION_POSITION) bounds.extend(DESTINATION_POSITION);
+    if(START_POSITION) bounds.extend(START_POSITION);
+    map.fitBounds(bounds, 48);
+  } else if(routePath.length === 1){
+    map.setCenter(routePath[0]);
+  }
+
+  dashboardMapContext = ctx;
+  Object.values(pendingRiderUpdates).forEach(rider => addOrUpdateRiderMarker(ctx, rider));
+  Object.keys(pendingRiderUpdates).forEach(id => delete pendingRiderUpdates[id]);
+  currentRiderMarker = ctx.riderMarkers[currentRiderId] || null;
+  updateRideRouteStats();
+  return ctx;
+}
+
+window.initGoogleMapsApi = function(){
+  if(dashboardMapContext) return;
+  const errorEl = document.getElementById('map-error');
+  if(errorEl) errorEl.classList.remove('visible');
+  try {
+    initDashboardMap(riderData);
+  } catch(error) {
+    setGoogleMapsError('Google Maps could not initialize: ' + error.message);
+  }
+};
+
+window.gm_authFailure = function(){
+  setGoogleMapsError('Google Maps authentication failed. Check the key, billing, Maps JavaScript API enablement, and HTTP referrer restrictions.');
+};
+
+// Real HTML5 Geolocation Tracking
+let geoWatchId = null;
+const activeGroupId = {% if active_pack %}{{ active_pack.id }}{% else %}null{% endif %};
+function resolveCurrentGroupId() {
+  if (activeGroupId) return Number(activeGroupId);
+  const pathMatch = window.location.pathname.match(/\/dashboard\/(\d+)\//) || window.location.pathname.match(/\/dashboard\/(\d+)$/);
+  if (pathMatch && pathMatch[1]) return Number(pathMatch[1]);
+  return null;
+}
+let currentGroupId = resolveCurrentGroupId();
+if(!currentGroupId){
+  clearActiveRideState();
+}
+window.addEventListener('pageshow', function(event) {
+  if(event.persisted || !currentGroupId){
+    clearActiveRideState();
+  }
+});
+const currentRiderId = normalizeRiderId('{{ user.id }}');
+const currentRiderInfo = riderData.find(rider => normalizeRiderId(rider.id) === currentRiderId) || {
+  id: currentRiderId,
+  name: '{{ profile.full_name|escapejs }}',
+  initials: '{{ profile.avatar_initials|escapejs }}',
+  color: '{{ profile.color_code|escapejs }}'
+};
+console.log('[PackTrace] socket initialization context', {
+  routeGroupId: currentGroupId,
+  activeGroupId,
+  isActivePackMember: {% if is_active_pack_member %}true{% else %}false{% endif %},
+  activePackStatus: '{% if active_pack %}{{ active_pack.status }}{% else %}none{% endif %}',
+  userId: '{{ user.id }}',
+  userRole: '{{ profile.role|default:"rider" }}'
+});
+
+function startRealGPSTracking(){
+  if(geoWatchId !== null) return;
+  if(currentGroupId){
+    initRideWebSocket();
+  }
+  setGpsStatus('Waiting for your current location...');
+  if (!navigator.geolocation) {
+    setGpsStatus('Current location is unavailable in this browser.');
+    return;
+  }
+
+  const geoOptions = {
+    enableHighAccuracy: true,
+    timeout: 60000,
+    maximumAge: 5000
+  };
+
+  geoWatchId = navigator.geolocation.watchPosition(
+    function(position) {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      if(!isValidCoordinate(lat, lng)){
+        setGpsStatus('GPS returned invalid coordinates; waiting for a valid fix.');
+        return;
+      }
+      const accuracy = position.coords.accuracy;
+      const rawSpeed = position.coords.speed; // meters per second
+      const speedKmH = (rawSpeed !== null && Number.isFinite(rawSpeed) && rawSpeed >= 0) ? rawSpeed * 3.6 : null;
+      const safeAccuracy = Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : null;
+      const heading = Number.isFinite(position.coords.heading) ? position.coords.heading : 0;
+      latestGpsLocation = { lat, lng };
+      latestGpsLocationAt = Date.now();
+      setGpsStatus(safeAccuracy === null
+        ? 'Location available.'
+        : `Accuracy: ±${Math.round(safeAccuracy)} m · Location available.`);
+
+      if(!dashboardMapContext && window.google && google.maps){
+        initDashboardMap(riderData);
+      }
+      if(dashboardMapContext && !hasCenteredOnCurrentLocation){
+        dashboardMapContext.map.setCenter({ lat, lng });
+        dashboardMapContext.map.setZoom(14);
+        hasCenteredOnCurrentLocation = true;
+      }
+      const centerButton = document.getElementById('center-current-location');
+      if(centerButton) centerButton.disabled = false;
+
+      // Update local UI immediately
+      updateRiderOnMap({ ...currentRiderInfo, latitude: lat, longitude: lng, speed: speedKmH, is_connected: true });
+
+      const speedEl = document.getElementById('speed-' + currentRiderId);
+      if(speedEl){
+        // Show GPS-provided speed immediately; if unavailable, show placeholder — the
+        // server-calculated speed (Haversine fallback) will arrive via WS echo shortly.
+        speedEl.textContent = (speedKmH !== null) ? (Math.round(speedKmH) + ' km/h') : '-- km/h';
+      }
+
+      // Send telemetry via WebSocket (preferred) or HTTP fallback
+      if(rideSocket && rideSocket.readyState === WebSocket.OPEN){
+        const payload = {
+          type: 'location_update',
+          latitude: lat,
+          longitude: lng,
+          speed: speedKmH,
+          accuracy: safeAccuracy,
+          heading: heading,
+          timestamp: new Date().toISOString()
+        };
+        console.log('[PackTrace] GPS SENT', { rideId: currentGroupId, userId: '{{ user.id }}', latitude: lat, longitude: lng });
+        rideSocket.send(JSON.stringify(payload));
+      } else if(currentGroupId){
+        console.warn('[PackTrace] GPS queued while WebSocket was not open', { rideId: currentGroupId, latitude: lat, longitude: lng });
+        fetch('/api/groups/' + currentGroupId + '/location/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({
+            latitude: lat,
+            longitude: lng,
+            speed: speedKmH,
+            accuracy: safeAccuracy,
+            heading: heading,
+            timestamp: new Date().toISOString()
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if(data.success && data.speed !== undefined){
+            // Server may have calculated speed via Haversine; update UI with accurate value
+            const spdEl = document.getElementById('speed-' + currentRiderId);
+            if(spdEl) spdEl.textContent = Math.round(data.speed) + ' km/h';
+          }
+          if(!data.success && data.error){
+            console.warn("Location update warning:", data.error);
+          }
+        })
+        .catch(err => console.error("Error sending GPS coordinates:", err));
+      }
+    },
+    function(err) {
+      const errors = {
+        1: 'Location permission is required to show your current position.',
+        2: 'Current location is unavailable.',
+        3: 'Location request timed out. Retrying...'
+      };
+      const message = errors[err.code] || 'GPS location failed: ' + err.message;
+      setGpsStatus(message);
+      console.warn(message);
+    },
+    geoOptions
+  );
+}
+
+function setMyLocationMarker(position){
+  if(!dashboardMapContext || !position || !isValidCoordinate(position.lat, position.lng)) return;
+  if(myLocationMarker){
+    myLocationMarker.setPosition(position);
+    myLocationMarker.setMap(dashboardMapContext.map);
+    return;
+  }
+  myLocationMarker = new google.maps.Marker({
+    map: dashboardMapContext.map,
+    position,
+    title: 'Current location',
+    zIndex: 999,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 11,
+      fillColor: '#4C7EFF',
+      fillOpacity: 1,
+      strokeColor: '#F5F7FA',
+      strokeWeight: 3
+    },
+    label: { text: 'You', color: '#F5F7FA', fontSize: '10px', fontWeight: '700' }
+  });
+}
+
+function centerOnCurrentLocation(){
+  if(!dashboardMapContext){
+    setGpsStatus('Waiting for your current location...');
+    return;
+  }
+
+  const position = latestGpsLocation && isValidCoordinate(latestGpsLocation.lat, latestGpsLocation.lng)
+    ? latestGpsLocation
+    : null;
+
+  if(position){
+    setMyLocationMarker(position);
+    dashboardMapContext.map.setCenter(position);
+    dashboardMapContext.map.setZoom(16);
+    setGpsStatus('Location available.');
+    return;
+  }
+
+  if(!navigator.geolocation){
+    setGpsStatus('Current location is unavailable in this browser.');
+    return;
+  }
+
+  setGpsStatus('Requesting your current location...');
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      if(!isValidCoordinate(latitude, longitude)){
+        setGpsStatus('Current location is unavailable.');
+        return;
+      }
+
+      latestGpsLocation = { lat: latitude, lng: longitude };
+      latestGpsLocationAt = Date.now();
+      const accuracy = Number(position.coords.accuracy);
+      setMyLocationMarker(latestGpsLocation);
+      dashboardMapContext.map.setCenter(latestGpsLocation);
+      dashboardMapContext.map.setZoom(16);
+      setGpsStatus(Number.isFinite(accuracy) && accuracy >= 0
+        ? `Accuracy: ±${Math.round(accuracy)} m · Location available.`
+        : 'Location available.');
+      const centerButton = document.getElementById('center-current-location');
+      if(centerButton) centerButton.disabled = false;
+    },
+    error => {
+      const messages = {
+        1: 'Location permission denied. Please allow location access in your browser.',
+        2: 'Current location is unavailable.',
+        3: 'Unable to get your current location. Please try again.'
+      };
+      const message = messages[error.code] || 'Unable to get your current location. Please try again.';
+      setGpsStatus(message);
+      console.warn('[PackTrace] Current location request failed:', message);
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+  );
+}
+
+// WebSocket Real-time Connection
+let rideSocket = null;
+const receivedSosAlertIds = new Set();
+
+function showSosToast(data){
+  const alertId = String(data.alert_id || `${data.ride_id}-${data.rider_id}-${data.timestamp}`);
+  if(receivedSosAlertIds.has(alertId)) return;
+  receivedSosAlertIds.add(alertId);
+  if(receivedSosAlertIds.size > 200){
+    receivedSosAlertIds.delete(receivedSosAlertIds.values().next().value);
+  }
+
+  const container = document.getElementById('sos-toast-container');
+  if(!container) return;
+  const toast = document.createElement('section');
+  toast.className = 'sos-toast';
+  if(data.rider_color) toast.style.borderLeftColor = data.rider_color;
+  toast.setAttribute('role', 'alert');
+  toast.dataset.alertId = alertId;
+
+  const heading = document.createElement('strong');
+  heading.className = 'sos-toast-heading';
+  heading.textContent = '🚨 SOS ALERT';
+  const closeButton = document.createElement('button');
+  closeButton.className = 'sos-toast-close';
+  closeButton.type = 'button';
+  closeButton.setAttribute('aria-label', 'Dismiss SOS alert');
+  closeButton.title = 'Dismiss alert';
+  closeButton.textContent = '×';
+  closeButton.addEventListener('click', () => toast.remove());
+
+  const sender = document.createElement('div');
+  sender.className = 'sos-toast-sender';
+  if(data.rider_color) sender.style.color = data.rider_color;
+  sender.textContent = `Rider ${data.rider_number || '?'} · ${data.rider_name || data.name || 'Rider'} has triggered an SOS.`;
+  const messageLabel = document.createElement('div');
+  messageLabel.className = 'sos-toast-label';
+  messageLabel.textContent = 'Message';
+  const message = document.createElement('div');
+  message.className = 'sos-toast-message';
+  message.textContent = data.message || 'Emergency assistance requested.';
+  const footer = document.createElement('div');
+  footer.className = 'sos-toast-footer';
+  const time = document.createElement('time');
+  const eventDate = data.timestamp ? new Date(data.timestamp) : new Date();
+  time.dateTime = eventDate.toISOString();
+  time.textContent = eventDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  footer.append(time);
+
+  if(isValidCoordinate(data.latitude, data.longitude)){
+    const locationButton = document.createElement('button');
+    locationButton.className = 'sos-toast-location';
+    locationButton.type = 'button';
+    locationButton.textContent = 'View location';
+    locationButton.addEventListener('click', () => {
+      if(!dashboardMapContext) return;
+      dashboardMapContext.map.setCenter({ lat: Number(data.latitude), lng: Number(data.longitude) });
+      dashboardMapContext.map.setZoom(16);
+    });
+    footer.append(locationButton);
+  }
+
+  toast.append(heading, closeButton, sender, messageLabel, message, footer);
+  container.append(toast);
+  window.setTimeout(() => toast.remove(), 30000);
+}
+
+function syncRiderRoster(riderInfo){
+  if(!riderInfo || !riderInfo.rider_number) return;
+  const riderId = normalizeRiderId(riderInfo.id || riderInfo.user_id || riderInfo.rider_id);
+  if(!riderId) return;
+  const riderList = document.getElementById('rider-list');
+  if(!riderList) return;
+  const color = riderInfo.color || getStableRiderColor(riderInfo.rider_number);
+  let item = document.getElementById(`rider-item-${riderId}`);
+
+  if(!item){
+    const emptyItem = riderList.querySelector('.rider-empty');
+    if(emptyItem) emptyItem.remove();
+    item = document.createElement('li');
+    item.className = 'rider-item';
+    item.id = `rider-item-${riderId}`;
+    item.dataset.riderId = riderId;
+
+    const dot = document.createElement('span');
+    dot.className = 'rider-dot';
+    dot.id = `dot-${riderId}`;
+    item.append(dot);
+    const info = document.createElement('div');
+    info.className = 'rider-info';
+    const identity = document.createElement('div');
+    identity.className = 'rider-identity';
+    identity.id = `identity-${riderId}`;
+    const name = document.createElement('div');
+    name.className = 'rider-name';
+    const nameValue = document.createElement('span');
+    nameValue.id = `name-${riderId}`;
+    name.append(nameValue);
+    const badge = document.createElement('span');
+    badge.id = `status-badge-${riderId}`;
+    badge.className = 'rider-status-badge';
+    name.append(badge);
+    const meta = document.createElement('div');
+    meta.className = 'rider-meta';
+    meta.id = `meta-${riderId}`;
+    info.append(identity, name, meta);
+    item.append(info);
+    const speedPanel = document.createElement('div');
+    speedPanel.className = 'rider-speed';
+    const speedLabel = document.createElement('span');
+    speedLabel.id = `speed-label-${riderId}`;
+    const speed = document.createElement('span');
+    speed.className = 'mono';
+    speed.id = `speed-${riderId}`;
+    speedPanel.append(speedLabel, speed);
+    item.append(speedPanel);
+    const lastLocation = document.createElement('div');
+    lastLocation.id = `last-loc-${riderId}`;
+    lastLocation.className = 'rider-last-location';
+    item.append(lastLocation);
+    item.addEventListener('click', () => {
+      riderList.querySelectorAll('.rider-item').forEach(row => row.classList.remove('selected'));
+      item.classList.add('selected');
+    });
+    riderList.append(item);
+  }
+
+  const connected = riderInfo.is_connected !== false;
+  item.dataset.connected = connected ? 'true' : 'false';
+  const role = riderInfo.role_display || riderInfo.role || 'Rider';
+  const dot = document.getElementById(`dot-${riderId}`);
+  const identity = document.getElementById(`identity-${riderId}`);
+  const name = document.getElementById(`name-${riderId}`);
+  const meta = document.getElementById(`meta-${riderId}`);
+  const badge = document.getElementById(`status-badge-${riderId}`);
+  const speedLabel = document.getElementById(`speed-label-${riderId}`);
+  const speed = document.getElementById(`speed-${riderId}`);
+  if(dot){ dot.style.backgroundColor = color; dot.style.color = color; }
+  if(identity){ identity.textContent = `Rider ${riderInfo.rider_number}`; identity.style.color = color; }
+  if(name) name.textContent = `${riderInfo.name || riderInfo.rider_name || 'Rider'}${riderId === currentRiderId ? ' (You)' : ''}`;
+  if(meta) meta.textContent = `${riderInfo.vehicle || 'Motorcycle'} · ${role}`;
+  if(badge){
+    badge.textContent = connected ? 'ACTIVE' : 'DISCONNECTED';
+    badge.classList.toggle('is-disconnected', !connected);
+  }
+  if(speedLabel) speedLabel.textContent = connected ? 'Speed' : 'Last Seen';
+  if(speed && riderInfo.speed !== undefined && riderInfo.speed !== null && connected){
+    speed.textContent = `${Math.round(riderInfo.speed)} km/h`;
+  }
+  const lastLocation = document.getElementById(`last-loc-${riderId}`);
+  if(item && riderInfo.sos_active) item.classList.add('pulse-sos');
+  if(lastLocation && isValidCoordinate(riderInfo.latitude, riderInfo.longitude)){
+    lastLocation.textContent = `Rider ${riderInfo.rider_number} · Loc: ${Number(riderInfo.latitude).toFixed(4)}, ${Number(riderInfo.longitude).toFixed(4)}`;
+    lastLocation.style.display = connected ? 'none' : 'block';
+  }
+  const rows = Array.from(riderList.querySelectorAll('.rider-item[data-rider-id]'));
+  rows.sort((first, second) => {
+    const firstNumber = Number(document.getElementById(`identity-${first.dataset.riderId}`)?.textContent.replace(/\D/g, '')) || 0;
+    const secondNumber = Number(document.getElementById(`identity-${second.dataset.riderId}`)?.textContent.replace(/\D/g, '')) || 0;
+    return firstNumber - secondNumber;
+  }).forEach(row => riderList.append(row));
+  const onlineCount = rows.filter(row => row.dataset.connected === 'true').length;
+  const countBadge = document.getElementById('rider-count-badge');
+  if(countBadge) countBadge.textContent = `${onlineCount} online`;
+  const onlineStat = document.getElementById('stat-online-riders');
+  if(onlineStat) onlineStat.textContent = `${onlineCount} / ${rows.length}`;
+}
+
+function initRideWebSocket(){
+  currentGroupId = resolveCurrentGroupId();
+  if(!currentGroupId) {
+    console.warn('[PackTrace] Socket not initialized: no ride id available for this user.');
+    return;
+  }
+  if(rideSocket && (rideSocket.readyState === WebSocket.CONNECTING || rideSocket.readyState === WebSocket.OPEN)) return;
+
+  if(!currentGroupId){
+    clearActiveRideState();
+    return;
+  }
+
+  const wsScheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const wsUrl = wsScheme + window.location.host + '/ws/rides/' + currentGroupId + '/';
+  console.log('[PackTrace] WS INITIALIZING', { rideId: currentGroupId, url: wsUrl, protocol: window.location.protocol, host: window.location.host });
+
+  try {
+    rideSocket = new WebSocket(wsUrl);
+
+    rideSocket.onopen = function() {
+      console.log('[PackTrace] WS OPEN', { rideId: currentGroupId, url: wsUrl });
+    };
+
+
+    rideSocket.onmessage = function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        if(data && data.ride_id !== undefined && (currentGroupId === null || Number(data.ride_id) !== Number(currentGroupId))) {
+          return;
+        }
+
+        if(data.type === 'location_update'){
+          const rId = normalizeRiderId(data.rider_id);
+          console.log('[PackTrace] RIDER STATE', {
+            riderId: rId,
+            rawRiderId: data.rider_id,
+            type: data.type,
+            name: data.name,
+            mapReady: !!dashboardMapContext,
+            markerKeys: dashboardMapContext ? Object.keys(dashboardMapContext.riderMarkers) : [],
+            latitude: data.latitude,
+            longitude: data.longitude
+          });
+
+          // Update map marker & trail (creates marker on first fix if not already present)
+          updateRiderOnMap({
+            id: rId,
+            user_id: data.rider_id,
+            rider_number: data.rider_number,
+            name: data.name,
+            initials: data.initials || rId,
+            color: data.color,
+            role: data.role,
+            vehicle: data.vehicle,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            speed: data.speed,
+            is_connected: true
+          });
+          syncRiderRoster({ ...data, id: rId, is_connected: true });
+
+          const speedLabelEl = document.getElementById('speed-label-' + rId);
+          if(speedLabelEl) speedLabelEl.textContent = 'Speed';
+
+          const speedEl = document.getElementById('speed-' + rId);
+          if(speedEl && data.speed !== undefined){
+            speedEl.textContent = Math.round(data.speed) + ' km/h';
+          }
+
+          const locEl = document.getElementById('last-loc-' + rId);
+          if(locEl) locEl.style.display = 'none';
+
+          const badge = document.getElementById('status-badge-' + rId);
+          if(badge){
+            badge.textContent = 'ACTIVE';
+            badge.style.background = 'rgba(62,207,142,.15)';
+            badge.style.color = 'var(--trace-green)';
+            badge.style.borderColor = 'rgba(62,207,142,.3)';
+          }
+        } else if(data.type === 'rider_disconnected' || (data.type === 'rider_status_update' && data.is_connected === false)){
+          const rId = normalizeRiderId(data.rider_id);
+          syncRiderRoster({
+            ...data,
+            id: rId,
+            latitude: data.latitude ?? data.last_latitude,
+            longitude: data.longitude ?? data.last_longitude,
+            is_connected: false
+          });
+          const badge = document.getElementById('status-badge-' + rId);
+          if(badge){
+            badge.textContent = 'DISCONNECTED';
+            badge.style.background = 'rgba(242,169,59,.15)';
+            badge.style.color = 'var(--signal-amber)';
+            badge.style.borderColor = 'rgba(242,169,59,.3)';
+          }
+
+          const speedLabelEl = document.getElementById('speed-label-' + rId);
+          if(speedLabelEl) speedLabelEl.textContent = 'Last Seen';
+
+          const speedEl = document.getElementById('speed-' + rId);
+          if(speedEl && data.last_seen) {
+              const dt = new Date(data.last_seen);
+              speedEl.innerHTML = '<span style="font-size: 0.75rem;">' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + '</span>';
+          } else if(speedEl) {
+              speedEl.innerHTML = '<span style="font-size: 0.75rem;">Unknown</span>';
+          }
+          
+          const locEl = document.getElementById('last-loc-' + rId);
+          if(locEl) {
+             if(isValidCoordinate(data.last_latitude, data.last_longitude)) {
+                 locEl.style.display = 'block';
+                 locEl.textContent = 'Rider ' + (data.rider_number || '?') + ' · Loc: ' + data.last_latitude.toFixed(4) + ', ' + data.last_longitude.toFixed(4);
+             } else {
+                 locEl.style.display = 'none';
+                 locEl.textContent = '';
+             }
+          }
+
+          // Keep marker visible at last known coordinates
+          if(isValidCoordinate(data.last_latitude, data.last_longitude) && dashboardMapContext && dashboardMapContext.riderMarkers[rId]){
+            dashboardMapContext.riderMarkers[rId].setPosition({ lat: data.last_latitude, lng: data.last_longitude });
+            dashboardMapContext.riderMarkers[rId].setOpacity(0.65);
+          }
+        } else if(data.type === 'rider_reconnected' || (data.type === 'rider_status_update' && data.is_connected === true)){
+          const rId = normalizeRiderId(data.rider_id);
+          syncRiderRoster({ ...data, id: rId, is_connected: true });
+          if(isValidCoordinate(data.latitude, data.longitude)){
+            updateRiderOnMap({ ...data, id: rId, is_connected: true });
+          }
+          const speedLabelEl = document.getElementById('speed-label-' + rId);
+          if(speedLabelEl) speedLabelEl.textContent = 'Speed';
+
+          const locEl = document.getElementById('last-loc-' + rId);
+          if(locEl) locEl.style.display = 'none';
+
+          const badge = document.getElementById('status-badge-' + rId);
+          if(badge){
+            badge.textContent = 'ACTIVE';
+            badge.style.background = 'rgba(62,207,142,.15)';
+            badge.style.color = 'var(--trace-green)';
+            badge.style.borderColor = 'rgba(62,207,142,.3)';
+          }
+          if(dashboardMapContext && dashboardMapContext.riderMarkers[rId]){
+            dashboardMapContext.riderMarkers[rId].setOpacity(1.0);
+          }
+        } else if(data.type === 'sos_alert'){
+          if(Number(data.ride_id) === Number(currentGroupId)) showSosToast(data);
+          
+          const rId = normalizeRiderId(data.rider_id);
+          syncRiderRoster({
+            id: rId,
+            rider_number: data.rider_number,
+            name: data.rider_name || data.name,
+            color: data.rider_color,
+            is_connected: true,
+            sos_active: true
+          });
+          const riderItem = document.getElementById('rider-item-' + rId);
+          if (riderItem) {
+              riderItem.classList.add('pulse-sos');
+          }
+          const badge = document.getElementById('status-badge-' + rId);
+          if (badge) {
+              badge.textContent = 'SOS ACTIVE';
+              badge.style.background = 'var(--danger)';
+              badge.style.color = '#fff';
+              badge.style.borderColor = 'var(--danger)';
+          }
+          if(dashboardMapContext && dashboardMapContext.riderMarkers[rId]){
+            // Highlight marker somehow if needed
+            dashboardMapContext.riderMarkers[rId].setOpacity(1.0);
+          }
+        } else if(data.type === 'sos_error'){
+          setGpsStatus(data.message || 'SOS could not be sent.');
+        } else if (data.type === 'sos_acknowledged') {
+          alert('ℹ ' + data.message);
+          const rId = normalizeRiderId(data.rider_id);
+          const badge = document.getElementById('status-badge-' + rId);
+          if (badge) {
+              badge.textContent = 'ACKNOWLEDGED';
+              badge.style.background = 'var(--route-blue)';
+              badge.style.color = '#fff';
+              badge.style.borderColor = 'var(--route-blue)';
+          }
+        } else if (data.type === 'sos_resolved') {
+          alert('✅ ' + data.message + ' by ' + data.resolved_by);
+          const rId = normalizeRiderId(data.rider_id);
+          const riderItem = document.getElementById('rider-item-' + rId);
+          if (riderItem) riderItem.classList.remove('pulse-sos');
+          
+          const badge = document.getElementById('status-badge-' + rId);
+          if (badge) {
+              badge.textContent = 'ACTIVE';
+              badge.style.background = 'rgba(62,207,142,.15)';
+              badge.style.color = 'var(--trace-green)';
+              badge.style.borderColor = 'rgba(62,207,142,.3)';
+          }
+        } else if (data.type === 'route_deviation') {
+          console.warn('Route Deviation Detected:', data.message);
+          // Show a subtle toast or alert if it's not the current user
+          if (data.rider_id != {{ user.id }}) {
+              // Optional: notify others. We just log for now to avoid spam.
+          } else {
+              // Notify the deviated rider
+              alert('⚠️ ROUTE DEVIATION:\n' + data.message);
+          }
+          const rId = normalizeRiderId(data.rider_id);
+          const badge = document.getElementById('status-badge-' + rId);
+          if (badge && !badge.textContent.includes('SOS')) {
+              badge.textContent = 'DEVIATED';
+              badge.style.background = 'rgba(242,169,59,.15)';
+              badge.style.color = 'var(--signal-amber)';
+              badge.style.borderColor = 'var(--signal-amber)';
+          }
+        }
+
+      } catch(err) {
+        console.error('Error handling WebSocket message:', err);
+      }
+    };
+
+    rideSocket.onclose = function(e) {
+      console.warn('WebSocket closed, attempting reconnect in 3s...', e.reason);
+      setTimeout(initRideWebSocket, 3000);
+    };
+
+    rideSocket.onerror = function(err) {
+      console.warn('WebSocket error, falling back to HTTP sync:', err);
+    };
+  } catch(e) {
+    console.warn('WebSocket not supported or failed to initialize:', e);
+  }
+}
+
+// Keep the live ride socket scoped to the active ride context for any joined rider.
+{% if active_pack and active_pack.status in 'READY,ACTIVE' and not is_active_pack_member %}
+  // Keep the socket available for joined members even before live ride state is fully active.
+{% endif %}
+if(currentGroupId){
+  initRideWebSocket();
+}
+// Request the signed-in rider's location on every dashboard visit.
+startRealGPSTracking();
+
+
+
+document.querySelectorAll('.rider-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.rider-item').forEach(i => i.classList.remove('selected'));
+    item.classList.add('selected');
+  });
+});
+
+// Join code copy helper
+function copyJoinCode(code){
+  navigator.clipboard.writeText(code).then(() => {
+    alert('Join code ' + code + ' copied to clipboard! Share it with riders.');
+  }).catch(() => {
+    prompt('Copy this join code:', code);
+  });
+}
+
+// Modal handling
+function getFreshGPSPosition(){
+  return new Promise((resolve, reject) => {
+    if(!navigator.geolocation){
+      reject(new Error('Location permission is required to start a ride.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(position => {
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      if(!isValidCoordinate(latitude, longitude)){
+        reject(new Error('The device returned invalid GPS coordinates.'));
+        return;
+      }
+      latestGpsLocation = { lat: latitude, lng: longitude };
+      latestGpsLocationAt = Date.now();
+      const accuracy = Number(position.coords.accuracy);
+      setGpsStatus(Number.isFinite(accuracy) && accuracy >= 0
+        ? `Accuracy: ±${Math.round(accuracy)} m · Location available.`
+        : 'Location available.');
+      if(!dashboardMapContext && window.google && google.maps) initDashboardMap(riderData);
+      if(dashboardMapContext && !hasCenteredOnCurrentLocation){
+        dashboardMapContext.map.setCenter(latestGpsLocation);
+        dashboardMapContext.map.setZoom(14);
+        hasCenteredOnCurrentLocation = true;
+      }
+      const centerButton = document.getElementById('center-current-location');
+      if(centerButton) centerButton.disabled = false;
+      updateRiderOnMap({ ...currentRiderInfo, latitude, longitude, is_connected: true });
+      resolve(latestGpsLocation);
+    }, error => {
+      const messages = {
+        1: 'Location permission is required to start a ride.',
+        2: 'Current location is unavailable.',
+        3: 'Location request timed out. Try again.'
+      };
+      const message = messages[error.code] || 'Could not obtain current GPS location.';
+      const cachedAgeMs = Date.now() - latestGpsLocationAt;
+      if(error.code === 3 && isValidCoordinate(latestGpsLocation && latestGpsLocation.lat, latestGpsLocation && latestGpsLocation.lng)
+          && cachedAgeMs <= 120000){
+        setGpsStatus('Location request timed out; using your recent browser GPS fix.');
+        resolve(latestGpsLocation);
+        return;
+      }
+      setGpsStatus(message);
+      reject(new Error(message));
+    }, { enableHighAccuracy: false, timeout: 30000, maximumAge: 30000 });
+  });
+}
+
+async function openCreateGroupModal(){
+  document.getElementById('create-group-modal').classList.add('open');
+  setRideCreateStatus('Getting your current GPS location…');
+  try {
+    await getFreshGPSPosition();
+    setRideCreateStatus('Current location ready. Select a destination on the map.');
+  } catch(error) {
+    setRideCreateStatus(error.message || 'Location permission is required to create a ride.');
+  }
+}
+
+function setRideCreateStatus(message){
+  const status = document.getElementById('ride-create-status');
+  if(!status) return;
+  status.textContent = message || '';
+  status.classList.toggle('visible', Boolean(message));
+}
+function closeCreateGroupModal(){
+  document.getElementById('create-group-modal').classList.remove('open');
+}
+
+function openDestinationMapPicker(){
+  if(!dashboardMapContext){
+    if(mapLoadError){
+      setGoogleMapsError(mapLoadError);
+    } else {
+      setGpsStatus('Waiting for your current location before opening the destination map.');
+    }
+    return;
+  }
+  const host = document.getElementById('destination-map-host');
+  const latitude = document.getElementById('new-group-dest-lat').value;
+  const longitude = document.getElementById('new-group-dest-lng').value;
+  pendingDestination = latitude && longitude
+    ? { latitude: Number(latitude), longitude: Number(longitude), name: document.getElementById('new-group-dest').value }
+    : null;
+  if(destinationMapClickListener) google.maps.event.removeListener(destinationMapClickListener);
+  destinationMapClickListener = dashboardMapContext.map.addListener('click', selectDestinationOnMap);
+  host.appendChild(dashboardMapElement);
+  document.getElementById('destination-map-modal').classList.add('open');
+  updatePendingDestinationDisplay();
+  if(pendingDestination){
+    dashboardMapContext.map.setCenter({ lat: pendingDestination.latitude, lng: pendingDestination.longitude });
+    dashboardMapContext.map.setZoom(14);
+  }
+  setTimeout(() => google.maps.event.trigger(dashboardMapContext.map, 'resize'), 80);
+}
+
+function closeDestinationMapPicker(){
+  if(destinationMapClickListener){
+    google.maps.event.removeListener(destinationMapClickListener);
+    destinationMapClickListener = null;
+  }
+  document.getElementById('destination-map-modal').classList.remove('open');
+  dashboardMapPlaceholder.parentNode.insertBefore(dashboardMapElement, dashboardMapPlaceholder);
+  if(committedDestination){
+    pendingDestination = { ...committedDestination };
+    setDestinationMarker(committedDestination.latitude, committedDestination.longitude);
+  } else {
+    pendingDestination = null;
+    if(destinationMarker){
+      destinationMarker.setMap(null);
+      destinationMarker = null;
+    }
+  }
+  if(dashboardMapContext) setTimeout(() => google.maps.event.trigger(dashboardMapContext.map, 'resize'), 80);
+}
+
+function setDestinationMarker(latitude, longitude){
+  if(!dashboardMapContext || !isValidCoordinate(latitude, longitude)) return;
+  const position = { lat: Number(latitude), lng: Number(longitude) };
+  if(destinationMarker){
+    destinationMarker.setPosition(position);
+    return;
+  }
+  destinationMarker = new google.maps.Marker({
+    map: dashboardMapContext.map,
+    position,
+    title: 'Selected destination',
+    label: { text: 'D', color: '#F9FAFB', fontSize: '12px', fontWeight: '700' },
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: '#E5595E',
+      fillOpacity: 1,
+      strokeColor: '#FFFFFF',
+      strokeWeight: 3
+    }
+  });
+}
+
+function updatePendingDestinationDisplay(message){
+  const status = document.getElementById('destination-map-status');
+  const confirmButton = document.getElementById('confirm-destination-button');
+  if(!pendingDestination){
+    status.textContent = message || 'Choose a location on the map.';
+    confirmButton.disabled = true;
+    return;
+  }
+  status.textContent = message || `${pendingDestination.name || 'Selected location'} · ${pendingDestination.latitude.toFixed(6)}, ${pendingDestination.longitude.toFixed(6)}`;
+  confirmButton.disabled = !pendingRoute;
+}
+
+function selectDestinationOnMap(event){
+  const latitude = event.latLng.lat();
+  const longitude = event.latLng.lng();
+  const requestId = ++reverseGeocodeRequest;
+  pendingDestination = { latitude, longitude, name: '' };
+  pendingRoute = null;
+  setDestinationMarker(latitude, longitude);
+  updatePendingDestinationDisplay('Calculating road route…');
+
+  if(!latestGpsLocation){
+    updatePendingDestinationDisplay('Waiting for your current GPS location…');
+    return;
+  }
+  calculateRoadRoute(latestGpsLocation, { lat: latitude, lng: longitude })
+    .then(route => {
+      if(requestId !== reverseGeocodeRequest || !pendingDestination) return;
+      pendingRoute = route;
+      applyPlannedRoute(route);
+      updatePendingDestinationDisplay(`${formatRouteDistance(route.distanceMeters)} · ${formatRouteDuration(route.durationSeconds)}. Confirm destination.`);
+    })
+    .catch(error => {
+      if(requestId !== reverseGeocodeRequest || !pendingDestination) return;
+      updatePendingDestinationDisplay(error.message || 'Could not calculate a road route.');
+    });
+
+  const query = new URLSearchParams({
+    format: 'jsonv2',
+    lat: latitude,
+    lon: longitude,
+    'accept-language': 'en'
+  });
+  fetch('https://nominatim.openstreetmap.org/reverse?' + query.toString())
+    .then(response => {
+      if(!response.ok) throw new Error('Reverse geocoding failed');
+      return response.json();
+    })
+    .then(data => {
+      if(requestId !== reverseGeocodeRequest || !pendingDestination) return;
+      pendingDestination.name = (data.name || data.display_name || '').slice(0, 150);
+      updatePendingDestinationDisplay(pendingDestination.name || 'Location selected');
+    })
+    .catch(() => {
+      if(requestId !== reverseGeocodeRequest || !pendingDestination) return;
+      pendingDestination.name = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+      updatePendingDestinationDisplay('Address unavailable; coordinates are ready to confirm.');
+    });
+}
+
+function confirmDestinationSelection(){
+  if(!pendingDestination || !pendingRoute) return;
+  const destinationName = pendingDestination.name || `${pendingDestination.latitude.toFixed(6)}, ${pendingDestination.longitude.toFixed(6)}`;
+  committedDestination = { ...pendingDestination, name: destinationName };
+  selectedRoute = pendingRoute;
+  document.getElementById('new-group-dest').value = destinationName;
+  document.getElementById('new-group-dest-lat').value = pendingDestination.latitude.toFixed(6);
+  document.getElementById('new-group-dest-lng').value = pendingDestination.longitude.toFixed(6);
+  document.getElementById('destination-coordinates').textContent = `Latitude: ${pendingDestination.latitude.toFixed(6)} · Longitude: ${pendingDestination.longitude.toFixed(6)}`;
+  document.getElementById('destination-details').classList.add('visible');
+  document.getElementById('destination-error').classList.remove('visible');
+  closeDestinationMapPicker();
+}
+
+document.getElementById('new-group-dest').addEventListener('input', event => {
+  if(committedDestination && event.target.value.trim() !== committedDestination.name){
+    committedDestination = null;
+    selectedRoute = null;
+    pendingRoute = null;
+    document.getElementById('new-group-dest-lat').value = '';
+    document.getElementById('new-group-dest-lng').value = '';
+    document.getElementById('destination-details').classList.remove('visible');
+  }
+  document.getElementById('destination-error').classList.remove('visible');
+});
+
+function openJoinGroupModal(){
+  document.getElementById('join-group-modal').classList.add('open');
+}
+function closeJoinGroupModal(){
+  document.getElementById('join-group-modal').classList.remove('open');
+}
+
+async function handleCreateGroupSubmit(e){
+  e.preventDefault();
+  const name = document.getElementById('new-group-name').value.trim();
+  const destination = document.getElementById('new-group-dest').value.trim();
+  const desc = document.getElementById('new-group-desc').value.trim();
+  const destinationError = document.getElementById('destination-error');
+  const submitButton = document.querySelector('#create-group-form button[type="submit"]');
+
+  if(!name){
+    alert('Please enter a group name.');
+    return;
+  }
+  if(!destination || !committedDestination || !selectedRoute){
+    destinationError.classList.add('visible');
+    destinationError.textContent = 'Select a destination and wait for its road route to calculate.';
+    return;
+  }
+  destinationError.classList.remove('visible');
+
+  let currentLocation;
+  if(isValidCoordinate(latestGpsLocation && latestGpsLocation.lat, latestGpsLocation && latestGpsLocation.lng)
+      && Date.now() - latestGpsLocationAt <= 300000){
+    currentLocation = { ...latestGpsLocation };
+  }
+  try {
+    if(!currentLocation){
+      setRideCreateStatus('Refreshing your current location…');
+      currentLocation = await getFreshGPSPosition();
+    }
+    if(!routeOrigin || haversineMeters(routeOrigin, currentLocation) > 30){
+      setRideCreateStatus('Updating route from your latest GPS location…');
+      selectedRoute = await calculateRoadRoute(currentLocation, {
+        lat: committedDestination.latitude,
+        lng: committedDestination.longitude
+      });
+      applyPlannedRoute(selectedRoute);
+    }
+  } catch(error) {
+    setRideCreateStatus(error.message || 'A current GPS fix and road route are required.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('destination_name', destination);
+  formData.append('destination_latitude', document.getElementById('new-group-dest-lat').value);
+  formData.append('destination_longitude', document.getElementById('new-group-dest-lng').value);
+  formData.append('start_latitude', currentLocation.lat);
+  formData.append('start_longitude', currentLocation.lng);
+  formData.append('planned_route', JSON.stringify(selectedRoute.path));
+  formData.append('route_distance_meters', selectedRoute.distanceMeters);
+  formData.append('route_duration_seconds', selectedRoute.durationSeconds);
+  formData.append('description', desc);
+
+  submitButton.disabled = true;
+  submitButton.textContent = 'Creating ride…';
+  setRideCreateStatus('Saving your ride and planned route…');
+  try {
+    const response = await fetch('{% url "create_group" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    });
+    const data = await response.json();
+    if(!response.ok || !data.success){
+      throw new Error(data.error || 'Failed to create ride. Please try again.');
+    }
+    alert('🎉 Group created successfully!\nJoin Code: ' + data.join_code + '\nYou are now the LEADER.');
+    window.location.href = data.redirect_url;
+  } catch(error) {
+    setRideCreateStatus(error.message || 'Network error creating ride. Please try again.');
+    submitButton.disabled = false;
+    submitButton.textContent = 'Create & Lead';
+  }
+}
+
+function handleJoinGroupSubmit(e){
+  e.preventDefault();
+  const code = document.getElementById('input-join-code').value.trim().toUpperCase();
+
+  if(!code){
+    alert('Please enter a join code.');
+    return;
+  }
+
+  fetch('{% url "api_join_group" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ join_code: code })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.success){
+      alert('🎉 ' + data.message + '\nWelcome to the group!');
+      window.location.href = data.redirect_url;
+    } else {
+      alert(data.error || 'Failed to join group');
+      if(data.redirect_url){
+        window.location.href = data.redirect_url;
+      }
+    }
+  })
+  .catch(err => alert('Network error joining group'));
+}
+
+// Start Ride Function (Leader)
+async function startRideNow(groupId){
+  const button = document.getElementById('btn-start-ride');
+  if(button) button.disabled = true;
+  try {
+    if(!DESTINATION_POSITION || plannedRouteData.length < 2){
+      throw new Error('Select a destination and calculate a road route before starting.');
+    }
+    const freshLocation = await getFreshGPSPosition();
+    if(!routeOrigin || haversineMeters(routeOrigin, freshLocation) > 30){
+      const updatedRoute = await calculateRoadRoute(freshLocation, DESTINATION_POSITION);
+      applyPlannedRoute(updatedRoute);
+    }
+    const response = await fetch('/api/groups/' + groupId + '/start/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({
+        start_latitude: freshLocation.lat,
+        start_longitude: freshLocation.lng,
+        planned_route: plannedRouteData.map(point => [point.lat, point.lng]),
+        route_distance_meters: plannedRouteDistanceMeters,
+        route_duration_seconds: plannedRouteDurationSeconds
+      })
+    });
+    const data = await response.json();
+    if(!data.success) throw new Error(data.error || 'Failed to start ride.');
+    alert('🚀 ' + data.message);
+    window.location.reload();
+  } catch(error) {
+    setGpsStatus(error.message || 'Could not start the ride.');
+    alert(error.message || 'Network error starting ride.');
+  } finally {
+    if(button && button.isConnected) button.disabled = false;
+  }
+}
+
+// End Ride Function (Leader)
+function endRideNow(groupId){
+  if(!confirm('Are you sure you want to end and complete this ride for the entire pack? All location logs will be preserved in Ride History.')) return;
+
+  clearActiveRideState();
+
+  fetch('/api/groups/' + groupId + '/end/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.success){
+      if(geoWatchId !== null){
+        navigator.geolocation.clearWatch(geoWatchId);
+        geoWatchId = null;
+      }
+      if(rideSocket){
+        rideSocket.onclose = null;
+        rideSocket.onerror = null;
+        rideSocket.close();
+        rideSocket = null;
+      }
+      alert('🏁 ' + data.message);
+      window.location.href = data.redirect_url || '/rides/history/';
+    } else {
+      alert(data.error || 'Failed to end ride');
+    }
+  })
+  .catch(err => alert('Network error ending ride'));
+}
+
+// Live state polling every 3 seconds for active group
+{% if active_pack and active_pack.status == 'ACTIVE' %}
+setInterval(() => {
+  fetch('/api/groups/{{ active_pack.id }}/live-state/')
+    .then(res => res.json())
+    .then(data => {
+      if(data.success){
+        const elapsedEl = document.getElementById('stat-elapsed-time');
+        if(elapsedEl && data.elapsed_display) elapsedEl.textContent = data.elapsed_display;
+
+        const onlineCountEl = document.getElementById('stat-online-riders');
+        if(onlineCountEl) onlineCountEl.textContent = data.online_riders_count + ' / ' + data.total_riders_count;
+
+        const countBadge = document.getElementById('rider-count-badge');
+        if(countBadge) countBadge.textContent = data.online_riders_count + ' online';
+
+        const avgSpeedEl = document.getElementById('stat-avg-speed');
+        if(avgSpeedEl && data.avg_speed_kmh !== undefined) avgSpeedEl.textContent = Math.round(data.avg_speed_kmh) + ' km/h';
+
+        // Update map markers, trails, speed displays, and status badges for all riders
+        if(data.members){
+          data.members.forEach(m => {
+            // Update map (creates marker on first GPS fix, updates existing ones)
+            updateRiderOnMap({
+              id: m.id,
+              user_id: m.user_id,
+              rider_number: m.rider_number,
+              name: m.name,
+              initials: m.initials,
+              color: m.color,
+              role: m.role_display || m.role,
+              vehicle: m.vehicle,
+              latitude: m.latitude,
+              longitude: m.longitude,
+              speed: m.speed,
+              is_connected: m.is_connected
+            });
+            syncRiderRoster({ ...m, id: m.id });
+
+            // Update speed display in rider card
+            const spdEl = document.getElementById('speed-' + m.id);
+            if(spdEl){
+              if(m.is_connected){
+                spdEl.textContent = (m.speed !== undefined && m.speed !== null)
+                  ? Math.round(m.speed) + ' km/h'
+                  : '-- km/h';
+              }
+              // If disconnected, the last-seen time is shown — don't overwrite it here
+            }
+
+            // Route deviation badge
+            if(m.route_deviation){
+              const badge = document.getElementById('status-badge-' + m.id);
+              if(badge && !badge.textContent.includes('SOS')){
+                badge.textContent = 'DEVIATED';
+                badge.style.background = 'rgba(242,169,59,.15)';
+                badge.style.color = 'var(--signal-amber)';
+                badge.style.borderColor = 'var(--signal-amber)';
+              }
+            }
+          });
+        }
+
+        if(data.is_live){
+          const indicator = document.getElementById('live-pill-indicator');
+          if(indicator){
+            indicator.innerHTML = '<span class="pulse-dot" style="width:6px;height:6px;"></span>Live';
+            indicator.style.background = 'rgba(62,207,142,.12)';
+            indicator.style.borderColor = 'var(--trace-green-dim)';
+            indicator.style.color = 'var(--trace-green)';
+          }
+          const btn = document.getElementById('btn-start-ride');
+          if(btn) btn.style.display = 'none';
+        }
+        
+        // Highlight SOS riders from polling
+        if(data.active_alerts){
+           data.active_alerts.forEach(alertData => {
+              const rId = normalizeRiderId(alertData.ride_member__user_id);
+              const riderItem = document.getElementById('rider-item-' + rId);
+              if (riderItem) riderItem.classList.add('pulse-sos');
+              const badge = document.getElementById('status-badge-' + rId);
+              if (badge) {
+                  badge.textContent = 'SOS ACTIVE';
+                  badge.style.background = 'var(--danger)';
+                  badge.style.color = '#fff';
+                  badge.style.borderColor = 'var(--danger)';
+              }
+           });
+        }
+      }
+    })
+    .catch(() => {});
+}, 3000);
+{% endif %}
+
+
+// SOS Emergency Trigger
+function triggerSosModal(){
+  const msg = prompt('Broadcast SOS Emergency to pack members & admin?', 'Need roadside assistance!');
+  if(!msg) return;
+
+  console.log('[PackTrace] SOS BUTTON CLICK', {
+    user: '{{ user.id }}',
+    ride: currentGroupId,
+    hasGps: !!latestGpsLocation,
+    messageLength: msg.length,
+    socketReady: !!(rideSocket && rideSocket.readyState === WebSocket.OPEN)
+  });
+
+  if (typeof rideSocket !== 'undefined' && rideSocket.readyState === WebSocket.OPEN) {
+     const position = latestGpsLocation || (dashboardMapContext && dashboardMapContext.riderMarkers[currentRiderId]
+       ? dashboardMapContext.riderMarkers[currentRiderId].getPosition().toJSON()
+       : null);
+
+     console.log('[PackTrace] SOS ACTIVATION SENT', {
+        user: '{{ user.id }}',
+        ride: currentGroupId,
+        latitude: position ? position.lat : null,
+        longitude: position ? position.lng : null
+     });
+
+     rideSocket.send(JSON.stringify({
+        'type': 'sos_alert',
+        'latitude': position ? position.lat : null,
+        'longitude': position ? position.lng : null,
+        'message': msg
+     }));
+        setGpsStatus('SOS sent to connected riders in this ride.');
+  } else {
+     alert('Network error: Live tracking WebSocket is currently disconnected. Cannot send SOS.');
+  }
+}
+</script>
+{% if google_maps_api_key %}
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&amp;callback=initGoogleMapsApi" onerror="setGoogleMapsError('Google Maps JavaScript API failed to load. Check network access and API configuration.')"></script>
+{% else %}
+<script>setGoogleMapsError('Google Maps is not configured. Set GOOGLE_MAPS_API_KEY in the application environment to enable the map.');</script>
+{% endif %}
+</body>
+</html>
